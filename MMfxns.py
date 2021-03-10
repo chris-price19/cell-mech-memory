@@ -30,14 +30,20 @@ sns.set(style="ticks", font_scale=1.5)
 mcolors = dict(m2colors.BASE_COLORS, **m2colors.CSS4_COLORS)
 
 def U(fm, m, x, a, params):
-    
+    km = fm(m, {'type':params['km'], 'm0':params['m0']})
+    kc = fm(m, {'type':params['kc'], 'm0':params['m0']})
+    return (-km - a) * x + x**2/2 * (km + kc) + a * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n'])
+
+def U_old(fm, m, x, a, params):
     return -fm(m, params)*x + x**2/(2*params['tau']) - a/(params['n']+1)*x**(params['n']+1) * scipy.special.hyp2f1(1, (params['n']+1)/params['n'], (2*params['n']+1)/params['n'], -x**params['n'])
 
 def x_crit(n):
     return ((n-1)/(n+1))**(1/n)
 
-def alpha_crit(n, tau):
-    return 4*n/(tau*(n-1)**((n-1)/n)*(n+1)**((n+1)/n))
+def alpha_crit(n, m, params):
+    km = f_m(m, {'type':params['km'], 'm0':params['m0']})
+    kc = f_m(m, {'type':params['kc'], 'm0':params['m0']})
+    return 4 * n * (km + kc)/((n-1)**((n-1)/n)*(n+1)**((n+1)/n))
 
 def m_crit(n, tau, m0):
     return -m0*np.log(1 - (( (n-1)/(n+1))**(1/n) ) * (1/tau-2/(n+1)))
@@ -46,21 +52,30 @@ def m_crit_over_m0(n, tau):
     # stiff only
     return -np.log(1 - ( ((n-1)/(n+1))**(1/n) ) * (1/tau-2/(n+1)))
 
+def f_m(m, params):
+    if isinstance(params['type'], str):
+        if params['type'] == 'stiff':
+            return 1 - np.exp(-m/params['m0'])
+        if params['type'] == 'soft':
+            return 1 - np.exp(-params['m0']/m)
+        if params['type'] ==  'basic':
+            return m/params['m0']
+    else:
+        return params['type']
+
 def m_crit_general(mc, params):
     # general to f(m)
-    return ( (f_m(mc, params) - params['x_c']/params['tau'] + params['a_c'] * params['x_c']**params['n']/(params['x_c']**params['n']+1)) ) 
-
-def f_m(m, params):
-    if params['type'] == 'stiff':
-        return 1 - np.exp(-m/params['m0'])
-    if params['type'] == 'soft':
-        return 1 - np.exp(-params['m0']/m)
-    if params['type'] ==  'basic':
-        return m/params['m0']
+    km = f_m(mc, {'type':params['km'], 'm0':params['m0']})
+    kc = f_m(mc, {'type':params['kc'], 'm0':params['m0']})
+    return km - params['x_c'] * (km + kc) + alpha_crit(params['n'], mc, params) * params['x_c']**params['n']/(params['x_c']**params['n']+1)
+    # return (f_m(mc, params) - params['x_c']/params['tau'] + params['a_c'] * params['x_c']**params['n']/(params['x_c']**params['n']+1))
 
 def x_equil(x, m, alpha, params): 
 #     x = vs
     return ( f_m(m, params) - x/params['tau'] + alpha * x**params['n']/(x**params['n']+1) )
+    # return f_m(m, {'type':'stiff','m0':params['m0']}) - x * (f_m(m, {'type':'stiff','m0': params['m0']}) + f_m(m, {'type':'stiff','m0':params['m0']})) + alpha * x**params['n']/(x**params['n']+1)
+    # return f_m(m, {'type':'stiff','m0':params['m0']}) - x * (f_m(m, {'type':'stiff','m0': params['m0']}) + params['tau']) + alpha * x**params['n']/(x**params['n']+1)
+    # return f_m(m, {'type':'stiff','m0':params['m0']}) - x * (f_m(m, {'type':'stiff','m0': params['m0']}) - params['tau']) + alpha * x**params['n']/(x**params['n']+1)
 
 def m1n3(alpha, n):
     if n != 3:
