@@ -599,49 +599,6 @@ def plot_groupedDF_heatmap(allDF, heat_cols, prettylabel, limits=[None, None]):
                   )
     return fig
 
-def plot_sample_dynamics(ax, t, a1, a2, params):
-
-    dt = t[1] - t[0]        
-    
-    ax.plot(t, a1, linewidth=3., color=mcolors['green'], label='priming')
-    ax.plot(t + np.amax(t), a2, linewidth=3.,color=mcolors['green'],label='memory')
-
-    xlims = ax.get_xlim()
-    ylims = ax.get_ylim()
-    
-    w1 = t[a1 > params['a_c']][-1] - t[a1 > params['a_c']][0]
-    w2 = t[a2 > params['a_c']][-1] - t[a2 > params['a_c']][0]
-
-    # print(xlims)
-
-    # ax[1].legend(loc=1)
-    ax.plot([t[-1], t[-1]], [ylims[0], ylims[1]],
-          color = mcolors['black'], linewidth=3., linestyle='-.')
-
-    rect0 = patches.Rectangle((xlims[0], ylims[0]), 
-                         t[-1]-w1 + t[0]-xlims[0], ylims[1]-ylims[0], 
-                         color=mcolors['darkorange'], alpha=0.2)
-
-    rect1 = patches.Rectangle((t[-1] - w1, ylims[0]), 
-                             w1, ylims[1]-ylims[0], 
-                             color=mcolors['red'], alpha=0.2)
-    
-    rect2 = patches.Rectangle((t[-1], ylims[0]), 
-                             w2,ylims[1]-ylims[0], 
-                             color=mcolors['springgreen'], alpha=0.2)
-    
-    rect3 = patches.Rectangle((w2 + t[-1], ylims[0]), 
-                             t[-1] - w2 + xlims[1] - t[-1]*2, ylims[1]-ylims[0], 
-                             color=mcolors['darkviolet'], alpha=0.2)
-    
-    ax.add_patch(rect0); ax.add_patch(rect1); ax.add_patch(rect2); ax.add_patch(rect3)
-
-    ax.plot(xlims,[params['a_c'], params['a_c']], color = mcolors['green'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$')
-
-    ax.set_xlim(xlims); ax.set_ylim(ylims)
-
-    return ax
-
 if __name__ == '__main__':
     
     pd.set_option('display.expand_frame_repr', False, 'display.max_columns', None)
