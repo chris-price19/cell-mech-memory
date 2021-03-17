@@ -37,13 +37,25 @@ def f_m(m, params):
             return 1 - np.exp(-params['m0']/m)
         if params['type'] ==  'basic':
             return m/params['m0']
+        if params['type'] == 'linear':
+            return 0.3 * m/params['m0'] + .2
+        if params['type'] == '-stiff':
+            inv_og_tau = 1.
+            return -(1 - np.exp(-m/params['m0'])) + inv_og_tau
     else:
-        return params['type']
+        if isinstance(m, np.ndarray):
+            return params['type'] * np.ones(len(m))
+        else:
+            return params['type']
+
+def x_total(a, params):
+    # fix x_total at a = a0 to 1.
+    return params['xtt'] * (a - params['a0']) + 1. #params['x0']
 
 def U(fm, m, x, a, params):
     km = fm(m, {'type':params['km'], 'm0':params['m0']})
     kc = fm(m, {'type':params['kc'], 'm0':params['m0']})
-    return (-km - a) * x + x**2/2 * (km + kc) + a * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n'])
+    return (-km * x_total(a, params) - a) * x + x**2/2 * (km + kc) + a * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n'])
 
 def U_old(fm, m, x, a, params):
     return -fm(m, params)*x + x**2/(2*params['tau']) - a/(params['n']+1)*x**(params['n']+1) * scipy.special.hyp2f1(1, (params['n']+1)/params['n'], (2*params['n']+1)/params['n'], -x**params['n'])
@@ -61,7 +73,7 @@ def m_crit_general(mc, params):
     # general to f(m)
     km = f_m(mc, {'type':params['km'], 'm0':params['m0']})
     kc = f_m(mc, {'type':params['kc'], 'm0':params['m0']})
-    return km - params['x_c'] * (km + kc) + alpha_crit(mc, params) * params['x_c']**params['n']/(params['x_c']**params['n']+1)
+    return km * x_total(alpha_crit(mc, params), params) - params['x_c'] * (km + kc) + alpha_crit(mc, params) * params['x_c']**params['n']/(params['x_c']**params['n']+1)
     # return (f_m(mc, params) - params['x_c']/params['tau'] + params['a_c'] * params['x_c']**params['n']/(params['x_c']**params['n']+1))
 
 def x_equil(x, m, alpha, params): 
@@ -69,27 +81,50 @@ def x_equil(x, m, alpha, params):
     # dynamic nuclear exit rate
     km = f_m(m, {'type':params['km'], 'm0':params['m0']})
     kc = f_m(m, {'type':params['kc'], 'm0':params['m0']})
-    return km - x * (km + kc) + alpha * x**params['n']/(x**params['n']+1)
+    return km * x_total(alpha, params)  - x * (km + kc) + alpha * x**params['n']/(x**params['n']+1)
 
-# def m1n3(alpha, n):
-#     if n != 3:
-#         return
-#     x = (
-#         ((1/2 - 1j*np.sqrt(3)/2)*(3 + cmath.sqrt(9-4*np.sqrt(3)*alpha**(3/2)))**(1/3))/6**(1/3) + 
-#         ((1/2 + 1j*np.sqrt(3)/2)*(3 - cmath.sqrt(9-4*np.sqrt(3)*alpha**(3/2)))**(1/3))/6**(1/3)
-#     )
-#     m = -np.log(1-x + alpha * x**n/(1+x**n))
-#     return m
+def collect_minima(m_space, x_space, a_space, params):
+    
+    U_data = np.zeros((len(m_space), len(x_space), len(a_space)))
+    
+    gmin_overm = []; b1_overm = []; b2_overm = []; inf_overm = [];
+    capture2minima = []; capture_mvals = []; capmax = [];
+    for mi, mm in enumerate(m_space):
+        gmin_coords = []; bi1_coords = []; bi2_coords = []; inf_coords = []
+        for ai, aa in enumerate(a_space):
+            for xi, xx in enumerate(x_space):
+                U_data[mi, xi, ai] = U(f_m, mm, xx, aa, params)
+                
+            xargs = scipy.signal.argrelextrema(U_data[mi,:,ai], np.less)[0]      
+            x_mins = x_space[xargs]
+            save_xlen = len(x_mins)    
 
-# def m2n3(alpha, n):
-#     if n != 3:
-#         return
-#     x = (
-#         -((1/2 - 1j*np.sqrt(3)/2)**2 * (3 + cmath.sqrt(9-4*np.sqrt(3)*alpha**(3/2)))**(1/3))/6**(1/3) -
-#         ((1/2 + 1j*np.sqrt(3)/2)**2 * (3 - cmath.sqrt(9-4*np.sqrt(3)*alpha**(3/2)))**(1/3))/6**(1/3)
-#     )
-#     m = -np.log(1 - x + alpha * x**n / (1+x**n))
-#     return m
+            if len(x_mins) > 1:
+                bi1_coords.append([np.amin(x_mins), aa, U_data[mi, np.amin(xargs), ai]])
+                bi2_coords.append([np.amax(x_mins), aa, U_data[mi, np.amax(xargs), ai]])
+            elif len(x_mins) > 0:
+                gmin_coords.append([x_mins[U_data[mi, xargs, ai] == np.amin(U_data[mi, xargs, ai])][0], aa, np.amin(U_data[mi, xargs, ai])])
+                inf_coords.append([x_mins[U_data[mi, xargs, ai] == np.amax(U_data[mi, xargs, ai])][0], aa, np.amax(U_data[mi, xargs, ai])])
+            else:
+                x_mins = x_space[np.argmin(U_data[mi, :, ai])]
+                gmin_coords.append([np.amin(x_mins), aa, U_data[mi, np.argmin(U_data[mi,:,ai]), ai]])
+#                 gmin_coords.append([np.amin(x_mins), aa, U_data[mi, np.amin(xargs), ai]])
+        
+        gmin_overm.append(np.array(gmin_coords))
+        b1_overm.append(np.array(bi1_coords))
+        b2_overm.append(np.array(bi2_coords))
+        inf_overm.append(np.array(inf_coords))
+        
+        if len(b1_overm[-1]) > 0:
+            # get the minimum alpha where two minima appear for a given m (B1 and B2 are populated, second column)
+            # verified that using b1 or b2 gives the same results as it should
+            capmax.append(np.amax(b1_overm[-1][:,1]))
+            capture2minima.append(np.amin(b1_overm[-1][:,1]))
+            capture_mvals.append(mm)
+
+#     print(capture2minima)
+#     print(capture2test)
+    return U_data, gmin_overm, b1_overm, b2_overm, inf_overm, capture2minima, capture_mvals, capmax
 
 def build_mprof(inarr, res):
 
@@ -213,6 +248,24 @@ def calc_PD(params):
 
     return a_space, mtst
 
+def calc_PD_rates(params):
+
+    if 'x_max' not in params.keys():
+        params['x_max'] = params['x0']
+
+    a_space = np.linspace(0, params['a_max']+1, params['res'])
+    params['a_space'] = a_space
+    x_space = np.linspace(0.01, np.amax([params['x_max']*1.5, 5.]), params['res'])
+    params['x_space'] = x_space
+    # m_space = 
+
+    U_data, gmin_overm, b1_overm, b2_overm, inf_overm, capture2minima, capture_mvals, capmax = collect_minima(params['m_space'], x_space, a_space, params)
+
+    # first col is m values, second col is low minima (blue), third col is high minima (red)
+    mtst = np.concatenate((np.array(capture_mvals)[:,None], np.array(capture2minima)[:,None], np.array(capmax)[:,None]), axis=1)   
+
+    return mtst
+
 def update_alpha(t_region, alpha, params):
 
     if params['dynamics'] == 'constant':
@@ -257,21 +310,28 @@ def update_alpha(t_region, alpha, params):
 def integrate_profile(m_profile, t_space, params, resultsDF):
 
     # print('enter')
+    kmdict = {'type':params['km'], 'm0':params['m0']}
+    kcdict = {'type':params['kc'], 'm0':params['m0']}
 
-    dt = t_space[1] - t_space[0]
+    dt = params['dt']
     x_prof = np.zeros(len(t_space))
     alpha_prof = np.zeros(len(t_space))
     active_region = []; t_primelist = []; t1maxlist = []; deltaVlist = []; tsg_list = []
     t_region = [0,0] # (region, t)
     
-    a_space, mtst = calc_PD(params)
-    if np.isnan(mtst).any() or np.amin(a_space) > 0:
+    # a_space, mtst = calc_PD(params)
+    mtst2 = calc_PD_rates(params)
+
+    if np.isnan(mtst2).any() or np.amin(params['a_space']) > 0:
         params['earlyexit'] = 1
         return resultsDF, params
-    a_term = a_space[np.where(mtst < 0)[0]][0]
+
+    a_term = np.amax(mtst2[:,1])
 
     for ti, tt in enumerate(t_space):
-        
+
+        current_m_ind = np.where(np.abs(params['m_space'] - m_profile[ti]) == np.amin(np.abs(params['m_space'] - m_profile[ti])))[0][0]
+
         if ti == 0:
             x_prof[ti] = params['x0']
             alpha_prof[ti] = params['a0']
@@ -280,14 +340,21 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
         params['x_max'] = np.amax(x_prof)
         xUd = np.linspace(0, params['x_max']*2.5, int(1e5))
 
-        if alpha_prof[ti-1] >= params['a_c']:
-            m1, m2 = m_solve_real_positives(params['x_max']*1.5, alpha_prof[ti-1], params['n'], params['tau'], params['type'])
-            if np.isnan(m1) or np.isnan(m2):
-                print(params)
-                print(np.amax(m_profile))
-                print(np.amin(m_profile))
-                params['earlyexit'] = 1
-                return resultsDF, params
+        if alpha_prof[ti-1] >= params['a_c'][current_m_ind]:
+            # m1, m2 = m_solve_real_positives(params['x_max']*1.5, alpha_prof[ti-1], params['n'], params['tau'], params['type'])
+
+            m1ind = np.where(np.abs(mtst2[:,0] - params['m_space'][current_m_ind]) == np.amin(np.abs(mtst2[:,0] - params['m_space'][current_m_ind])))[0][0]
+
+            m1 = mtst2[m1ind, 0] / params['m0']
+            a1 = mtst2[m1ind, 1]
+            a2 = mtst2[m1ind, 2]
+
+            # if np.isnan(m1) or np.isnan(m2):
+            #     print(params)
+            #     print(np.amax(m_profile))
+            #     print(np.amin(m_profile))
+            #     params['earlyexit'] = 1
+            #     return resultsDF, params
         # else:
             # m1 = 0; m2 = 0
     
@@ -299,20 +366,11 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                 active_region.append(2)
             else:
                 active_region.append(6)
-#             dx = dt * (1 - np.exp(-m_profile[ti-1]/params['m0']) - x_prof[ti-1]/params['tau'] + alpha_prof[ti-1] * x_prof[ti-1]**n/(x_prof[ti-1]**n + 1))
-#             x_prof[ti] = x_prof[ti-1] + dx
+
         else:
-            
-            a_ss = (params['a_c'] - params['a0']) * f_m(m_profile[ti], params) # (1 - np.exp(-m_profile[ti] / params['m0']))
-            a_mstar = a_ss + (params['a0'] - a_ss)*np.exp(-4)
 
-            tprime = params['tau_SG'] * np.log(params['a_c']/a_mstar)
-            t1max = params['tau_SG'] * np.log(params['a1max']/a_mstar)
-            t_primelist.append(tprime)
-            t1maxlist.append(t1max)
-
-            if alpha_prof[ti-1] < params['a_c'] and m_profile[ti] / params['m0'] > params['m_c']:
-#                 # region 1
+            if alpha_prof[ti-1] < params['a_c'][current_m_ind] and m_profile[ti] / params['m0'] > params['m_c']:
+            # region 1
                 active_region.append(1)
 
                 if t_region[0] != 1:
@@ -321,17 +379,11 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                 else:
                     t_region[1] += dt
                     
-                # if t_region[1] < 4*params['tau_F']:
-                #     # alpha_prof[ti] = a_ss + (params['a0'] - a_ss)*np.exp(-t_region[1]/params['tau_F'])
-                #     # dalph = update_alpha(t_region, alpha_prof[ti-1], params)
-                #     dalph = alpha_prof[ti-1]/params['tau_F'] * params['dt']
-                # else:
-                # dalph = alpha_prof[ti-1]/params['tau_SG'] * dt
                 dalph = update_alpha(t_region, alpha_prof[ti-1], params)
                 alpha_prof[ti] = alpha_prof[ti-1] + dalph
                 # alpha_prof[ti] = a_mstar*np.exp((t_region[1]-4*params['tau_F'])/params['tau_SG'])
             
-            elif alpha_prof[ti-1] >= params['a_c'] and m_profile[ti] / params['m0'] > params['m_c']:
+            elif alpha_prof[ti-1] >= params['a_c'][current_m_ind] and m_profile[ti] / params['m0'] > params['m_c']:
                 # region 2
                 active_region.append(2)
 
@@ -350,7 +402,7 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                 else:
                     alpha_prof[ti] = params['a_max']
 
-            elif alpha_prof[ti-1] < params['a_c'] and m_profile[ti] / params['m0'] < params['m_c']:
+            elif alpha_prof[ti-1] < params['a_c'][current_m_ind] and m_profile[ti] / params['m0'] < params['m_c']:
                 # region 3
                 active_region.append(3)
                 
@@ -372,9 +424,10 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                     dalph = update_alpha(t_region, alpha_prof[ti-1], params)
                 else:
                     dalph = 0.
+
                 alpha_prof[ti] = alpha_prof[ti-1] + dalph
 
-            elif alpha_prof[ti-1] > params['a_c'] and m_profile[ti] / params['m0'] < m1 and alpha_prof[ti-1] <= a_term:
+            elif alpha_prof[ti-1] > params['a_c'][current_m_ind] and alpha_prof[ti-1] < a1 and m_profile[ti] / params['m0'] < params['m_c']:  # and alpha_prof[ti-1] <= a_term:
                 # region 4
    
                 active_region.append(4)
@@ -405,7 +458,8 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                 # print(dalph)
                 alpha_prof[ti] = alpha_prof[ti-1] + dalph
 
-            elif ((alpha_prof[ti-1] > params['a_c'] and m_profile[ti] / params['m0'] >= m1) or alpha_prof[ti-1] > a_term) and m_profile[ti] / params['m0'] <= m2:
+            # elif ((alpha_prof[ti-1] > params['a_c'] and m_profile[ti] / params['m0'] >= m1) or alpha_prof[ti-1] > a_term) and m_profile[ti] / params['m0'] <= m2:
+            elif alpha_prof[ti-1] > a1 and alpha_prof[ti-1] < a2 and m_profile[ti] / params['m0'] < params['m_c']:
                 # region 5
                 active_region.append(5)
 
@@ -426,7 +480,8 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                 dalph = update_alpha(t_region, alpha_prof[ti-1], params)
                 alpha_prof[ti] = alpha_prof[ti-1] + dalph
 
-            elif alpha_prof[ti-1] > params['a_c'] and m_profile[ti] / params['m0'] < params['m_c'] and m_profile[ti] / params['m0'] > m2:
+            # elif alpha_prof[ti-1] > params['a_c'] and m_profile[ti] / params['m0'] < params['m_c'] and m_profile[ti] / params['m0'] > m2:
+            elif alpha_prof[ti-1] > a2 and m_profile[ti] / params['m0'] < params['m_c']:
                 # region 6
                 active_region.append(6)
                 
@@ -503,8 +558,8 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
             tsg_list.append(params['tau_SG'])
 
     
-    params['t_prime'] = (np.unique(t_primelist) + 4*params['tau_F']).tolist()
-    params['t1max'] = (np.unique(t1maxlist) + 4*params['tau_F']).tolist()
+    # params['t_prime'] = (np.unique(t_primelist) + 4*params['tau_F']).tolist()
+    # params['t1max'] = (np.unique(t1maxlist) + 4*params['tau_F']).tolist()
 
     active_region.insert(0, active_region[0])
     deltaVlist.insert(0, deltaVlist[0])
@@ -625,18 +680,16 @@ def run_profile(e_func, inputs, params, resultsDF):
         params['t1max'] = [0.]
         return resultsDF, params, np.array([0]), np.array([0]), np.amax(m_profile), np.amin(m_profile)
 
-    x_c = x_crit(params['n'])
-    a_c = alpha_crit(params['n'], params['tau'])
-    params['x_c'] = x_c; params['a_c'] = a_c;
-
-    a_space, mtst = calc_PD(params)
+    x_c = x_crit(params['n']); params['x_c'] = x_c;
+    
+    # a_space, mtst = calc_PD(params)
     # print(a_space)
     # print(mtst)
-    try:
-        params['a1max'] = a_space[mtst[:,0] == np.nanmin(mtst[:,0])][0]
-        # params['a1max'] = a_space[mtst[:,0] == np.amin(mtst[:,0])][0]
-    except:
-        params['a1max'] = np.NaN
+    # try:
+    #     params['a1max'] = a_space[mtst[:,0] == np.nanmin(mtst[:,0])][0]
+    #     # params['a1max'] = a_space[mtst[:,0] == np.amin(mtst[:,0])][0]
+    # except:
+    #     params['a1max'] = np.NaN
     
     m_c = scipy.optimize.fsolve(m_crit_general, 0.5, args=(params), xtol=1e-10)[0] / params['m0']
     params['m_c'] = m_c
@@ -653,20 +706,22 @@ def run_profile(e_func, inputs, params, resultsDF):
         inputs[0,1] = m_c * params['m0'] - (-inputs[0,1]*m_c*params['m0'] * 0.9) 
         inputs[2,1] = m_c * params['m0'] - (-inputs[2,1]*m_c*params['m0'] * 0.9) 
 
-    # if inputs[1,1] < m_c * params['m0'] or inputs[2,1] > m_c * params['m0']:
-    #     print(inputs)
-    #     sys.exit()
-    # print(inputs)
-    # sys.exit()
-    print('--------')
-    print('a_c = %f, x_c = %f, m_c in absolute = %f' % (a_c, x_c, m_c * params['m0']))
+    m_profile = build_mprof(inputs, params['resolution'])
 
-    m_profile = build_mprof(inputs, params['resolution']) #         print(np.unique(m_profile))    print(len(m_profile))
+    m_space = np.linspace(np.amin([0.1, np.amin(m_profile)]), np.amax(m_profile)*1.5, params['res'])
+    choose_mc_ind = np.where(np.abs(m_space - m_c*params['m0']) == np.amin(np.abs(m_space-m_c*params['m0'])))[0][0]
+    a_c = alpha_crit(m_space, params)
+    params['a_c'] = a_c;
+    params['m_space'] = m_space #         print(np.unique(m_profile))    print(len(m_profile))
     # print(len(m_profile))
     # m profile is in absolute units
     # hours
+    print('--------')
+    print('a_c = %f, x_c = %f, m_c in absolute = %f' % (a_c[choose_mc_ind], x_c, m_c * params['m0']))
+
+    mtst2 = calc_PD_rates(params)
+
     t_space = np.linspace(0, np.sum(inputs[:,0]), len(m_profile))
-    # print('dt = %f hours' % (t_space[1]-t_space[0]))
     params['dt'] = t_space[1]-t_space[0]
 
     print(params['dynamics'])
@@ -680,10 +735,5 @@ def run_profile(e_func, inputs, params, resultsDF):
         early_exit(resultsDF, params, m_profile, t_space)
 
     priming_times, memory_times, stiffP, stiffA = summary_stats(resultsDF, params)
-
-    # print(type(priming_times))
-    # print(type(memory_times))
-    # print(type(stiffP))
-    # print(type(stiffA))
 
     return resultsDF, params, priming_times, memory_times, stiffP, stiffA

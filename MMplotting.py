@@ -418,8 +418,11 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     m = resultsDF['m_profile'].values
     a = resultsDF['alpha_prof'].values
     x = resultsDF['x_prof'].values
+    m_space = params['m_space']
     active_region = resultsDF['active_region'].values
     # print(active_region)
+
+    mc_ind = np.where(np.abs(m_space/ params['m0'] - params['m_c']) == np.amin(np.abs(m_space/ params['m0'] - params['m_c'])))[0][0]
     
     dt = t[1] - t[0]
         
@@ -449,7 +452,7 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     # lc4 = ax[0].plot([t[0],t[-1]],[params['a_max'],params['a_max']],color = mcolors['firebrick'], linestyle='-.', linewidth=2., label='\u03b1$_{max}$', zorder=4)
 
     ## a_c
-    lc3 = atwin.plot([t[0],t[-1]],[params['a_c'],params['a_c']],color = mcolors['green'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$', zorder=4)
+    lc3 = atwin.plot([t[0],t[-1]],[params['a_c'][mc_ind],params['a_c'][mc_ind]],color = mcolors['green'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$', zorder=4)
     ## x_c
     # ax[0].plot([t[0],t[-1]],[params['x_c'],params['x_c']],color = mcolors['black'], linestyle='-.', linewidth=2., label='x$_{c}$', zorder=4)
 

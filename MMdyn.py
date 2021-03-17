@@ -44,8 +44,8 @@ def plot_sample_dynamics(ax, t, a1, a2, params):
 
     dt = t[1] - t[0]        
     
-    ax.plot(t, a1, linewidth=3., color=mcolors['green'], label='priming')
-    ax.plot(t + np.amax(t), a2, linewidth=3.,color=mcolors['green'],label='memory')
+    ax.plot(t, a1, linewidth=3., color=mcolors['blue'], label='priming')
+    ax.plot(t + np.amax(t), a2, linewidth=3.,color=mcolors['blue'],label='memory')
 
     xlims = ax.get_xlim()
     ylims = ax.get_ylim()
@@ -77,7 +77,7 @@ def plot_sample_dynamics(ax, t, a1, a2, params):
     
     ax.add_patch(rect0); ax.add_patch(rect1); ax.add_patch(rect2); ax.add_patch(rect3)
 
-    ax.plot(xlims,[params['a_c'], params['a_c']], color = mcolors['green'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$')
+    ax.plot(xlims,[params['a_c'], params['a_c']], color = mcolors['blue'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$')
 
     ax.set_xlim(xlims); ax.set_ylim(ylims)
 
