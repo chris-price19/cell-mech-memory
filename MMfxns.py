@@ -21,6 +21,8 @@ import cmath
 import matplotlib.patches as patches
 from matplotlib import colors as m2colors
 
+from numpy.random import Generator, PCG64
+
 # import warnings
 # ## importing and doing this to ignore warning in plt add_patch
 # warnings.filterwarnings("ignore", category=DeprecationWarning) 
@@ -28,6 +30,15 @@ from matplotlib import colors as m2colors
 cwd = os.getcwd()
 sns.set(style="ticks", font_scale=1.5)
 mcolors = dict(m2colors.BASE_COLORS, **m2colors.CSS4_COLORS)
+
+class noise:
+    def __init__(self, mean=0., std = 1., mag = 0.1):
+        self.mean = mean
+        self.std = std
+        self.mag = mag
+        self.rg = Generator(PCG64())
+    def draw(self):
+        return self.mag * self.rg.normal(self.mean, self.std)
 
 def U(fm, m, x, a, params):
     
@@ -170,19 +181,19 @@ def m_solve_real_positives(x_lim, a_current, n_current, tau, stype):
     return m_roots[1], m_roots[0]
 
 def rle(inarray):
-        """ run length encoding. Partial credit to R rle function. 
-            Multi datatype arrays catered for including non Numpy
-            returns: tuple (runlengths, startpositions, values) """
-        ia = np.asarray(inarray)                # force numpy
-        n = len(ia)
-        if n == 0: 
-            return (None, None, None)
-        else:
-            y = np.array(ia[1:] != ia[:-1])     # pairwise unequal (string safe)
-            i = np.append(np.where(y), n - 1)   # must include last element posi
-            z = np.diff(np.append(-1, i))       # run lengths
-            p = np.cumsum(np.append(0, z))[:-1] # positions
-            return(z, p, ia[i])
+    """ run length encoding. Partial credit to R rle function. 
+        Multi datatype arrays catered for including non Numpy
+        returns: tuple (runlengths, startpositions, values) """
+    ia = np.asarray(inarray)                # force numpy
+    n = len(ia)
+    if n == 0: 
+        return (None, None, None)
+    else:
+        y = np.array(ia[1:] != ia[:-1])     # pairwise unequal (string safe)
+        i = np.append(np.where(y), n - 1)   # must include last element posi
+        z = np.diff(np.append(-1, i))       # run lengths
+        p = np.cumsum(np.append(0, z))[:-1] # positions
+        return(z, p, ia[i])
 
 def calc_PD(params):
     
@@ -242,12 +253,14 @@ def update_alpha(t_region, alpha, params):
     else:
         dalpha = 0.    
 
-    return dalpha
+    return dalpha + params['eps'].draw()
 
 
 def integrate_profile(m_profile, t_space, params, resultsDF):
 
     # print('enter')
+    if 'eps' not in params.keys():
+        params['eps'] = noise(0., 1., 0.012)
 
     dt = t_space[1] - t_space[0]
     x_prof = np.zeros(len(t_space))
@@ -485,7 +498,10 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                 params['tau_SG'] = (params['tau_R0'] * np.exp(deltaV/params['TV0SG']))
                 # we want t_sg to get larger w/ increasing depth so that it stops increasing               
             else:
-                print(deltaV)
+                pass
+                # print('dv')
+                # print(deltaV)
+
                 # deltaVlist.append(np.NaN)
                 # tsg_list.append(params['tau_SG'])
 
@@ -517,6 +533,7 @@ def summary_stats(resultsDF, params, verbose=True):
     m = resultsDF['m_profile'].values
     alpha = resultsDF['alpha_prof'].values
     x = resultsDF['x_prof'].values
+    active_region = resultsDF['active_region'].values
 
     def slice_tuple(slice_):
         return [slice_.start, slice_.stop, slice_.step]
@@ -556,8 +573,11 @@ def summary_stats(resultsDF, params, verbose=True):
             return priming_times, memory_times, stiffP, stiffA
 
     priming_start_stop = np.array([slice_tuple(r[0]) for r in regions])
+    # print('&&&')
+    # print(params['dt'])
     # print(priming_start_stop)
     # print(priming_start_stop[:,1])
+
     # memory time
     # mem_start_candidates = [np.amax(t[r]) + dt for r in regions]
     # print(mem_start_candidates)
@@ -588,17 +608,36 @@ def summary_stats(resultsDF, params, verbose=True):
         memory_times[mi] = np.sum(np.abs(x[mm:end_ind] - x_compare) > 0.05*x_compare) * dt
         
         # print(np.sum(np.abs(x[mm:end_ind] - x_compare) > 0.05*x_compare))    
-        
+    
+    counts, cumsum, ids = rle(active_region) 
+    memory2 = np.sum(counts[np.isin(ids, [5,6])]) * params['dt']
+    priming2 = np.sum(counts[np.isin(ids, [1,2])]) * params['dt']
+    if np.abs(memory2 - memory_times[0]) > 24:
+        print('oh no')
+        print(priming_times)
+        print(priming2)
+        print(memory_times)
+        print(memory2)
+        print(counts)
+        print(ids)
+        print(priming_start_stop)
+        # sys.exit()
+
     mech_stats = np.abs(stiffP - stiffA) / params['m0']
 
     if verbose:
+        print('counts', end=" "); print(ids)
+        print('ids', end=" "); print(counts)
         print('priming times', end=" "); print(priming_times)
+        print('priming check', end = " "); print(priming2)
         print('memory times', end=" "); print(memory_times)
+        print('memory check', end = " "); print(memory2)
         print('mechanical ratios', end=" "); print(mech_stats)
 
     # print('memory times', end=" "); print(memory_times)
 
-    return np.array(priming_times), memory_times, stiffP, stiffA # mech_stats
+    # return np.array(priming_times), memory_times, stiffP, stiffA # mech_stats
+    return np.array([priming2]), np.array([memory2]), stiffP, stiffA
 
 
 def run_profile(e_func, inputs, params, resultsDF):
