@@ -30,350 +30,7 @@ cwd = os.getcwd()
 sns.set(style="ticks", font_scale=1.5)
 mcolors = dict(m2colors.BASE_COLORS, **m2colors.CSS4_COLORS)
 
-def plot_blank_PD(params):
 
-    fig2, ax2 = plt.subplots(1,1,figsize=(7,5.5))
-
-    # a_space, mtst = calc_PD(params)
-    # ax2.plot(a_space[a_space>=params['a_c']], np.real(mtst[a_space>=params['a_c'],0]), color = mcolors['darkviolet'], linewidth=3., label='m1')
-    # ax2.plot(a_space[a_space>=params['a_c']], np.real(mtst[a_space>=params['a_c'],1]), color = mcolors['dodgerblue'], linewidth=3., label='m2')
-    ax2.set_xlabel('\u03b1')
-    ax2.set_ylabel('m')
-
-    ax2.plot([params['a_c'], params['a_c']],[0, params['m_c']+1], mcolors['green'], linewidth=3.5, linestyle='-.', label='\u03b1$_{c}$')
-    ax2.plot([0, params['a_max']+0.5], [params['m_c'], params['m_c']], mcolors['deeppink'], linewidth=3.5, linestyle='-.', label='m$_{c}$')
-    ## a_max
-    ax2.plot([params['a_max'], params['a_max']],[0, params['m_c']+1], mcolors['firebrick'], linewidth=3., linestyle='-.')
-
-    # ax2.legend(loc='upper center', bbox_to_anchor=(0.75, 1.15), ncol=2)
-
-    # ax2.set_xlim([0,params['a_max']+0.5])
-    ax2.set_xlim([0,2*params['a_c']])
-    ax2.set_ylim([0,2*params['m_c']])
-    
-    xlims = ax2.get_xlim()
-    ylims = ax2.get_ylim()
-    
-    # ax2.plot(a,m,color=mcolors['black'])
-    # mred = np.concatenate((m[np.abs(np.diff(m, prepend=0))>0], m[np.abs(np.diff(m, append=0))>0]))
-    # ared = np.concatenate((a[np.abs(np.diff(m, prepend=0))>0], a[np.abs(np.diff(m, append=0))>0]))
-    # tred = np.concatenate((t[np.abs(np.diff(m, prepend=0))>0], t[np.abs(np.diff(m, append=0))>0]))
-
-    # ax[1].scatter(tred, mred, color='r', s=120)
-    # ax2.scatter(ared, mred, color='r', s=120)
-
-    plt.tight_layout()
-
-    return fig2
-
-def subplot_PD(ax2, params, colors = [mcolors['darkorange'], mcolors['red'], mcolors['navy'], mcolors['darkviolet'], mcolors['deepskyblue'], mcolors['springgreen']]):
-    
-    a_space, mtst = calc_PD(params)
-
-    a_term = a_space[np.where(mtst < 0)[0]][0]
-    # print('aterm', end=" "); print(a_term)
-    # for mm in np.arange(len(mtst)):
-    #     print(mtst[mm,:])
-    # removing negative roots, essentially for ease of plotting purposes. is there a deeper meaning to the singularity for soft priming?
-    ##### **** ####
-    if params['type'] == 'soft':
-        mtst[mtst < 0] = params['m_c']*2 + 1
-    ##### **** ####
-
-    ax2.plot(a_space[a_space>=params['a_c']], np.real(mtst[a_space>=params['a_c'],0]), color = mcolors['darkviolet'], linewidth=3., label='memory loss')
-    # ax2[0].plot(a_space[a_space>=params['a_c']], np.real(mtst[a_space>=params['a_c'],1]), color = mcolors['dodgerblue'], linewidth=3., label='m2')
-    # ax2.set_xlabel('\u03b1')
-    # ax2.set_ylabel('m/m0')
-
-    ### turn on for fig 3, off otherwise
-    # ax2.set_xlim([0,params['a_max']+0.5])
-    # ax2.set_xlim([0,params['a_c'] * 2])
-    # ax2.set_ylim([0,params['m_c'] * 2])        
-
-    ax2.plot([params['a_c'], params['a_c']],[0, np.amax(ax2.get_ylim())], mcolors['green'], linewidth=4., linestyle='-.', label='\u03b1$_{c}$')
-    ax2.plot([0, np.amax(ax2.get_xlim())], [params['m_c'], params['m_c']], mcolors['deeppink'], linewidth=4., linestyle='-.',  label='m$_{c}$')
-    ## a_max
-    ax2.plot([params['a_max'], params['a_max']],[0, params['m_c']+1], mcolors['firebrick'], linewidth=3., linestyle='-.')
-   
-    xlims = ax2.get_xlim()
-    ylims = ax2.get_ylim()
-    
-    if params['type'] == 'stiff':
-        
-        ### turn on for fig 3, off otherwise
-        # ax2.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=3)
-
-        for ni, nn in enumerate((np.arange(6)+1)):
-            if nn == 1:
-                rect = patches.Rectangle((xlims[0],params['m_c']),params['a_c']-xlims[0],ylims[1]-params['m_c'], color=colors[nn-1], alpha=0.2)
-                ax2.add_patch(rect)
-            elif nn == 2:            
-                rect = patches.Rectangle((params['a_c'],params['m_c']),xlims[1]-params['a_c'], ylims[1]-params['m_c'], color=colors[nn-1], alpha=0.2)
-                ax2.add_patch(rect)
-            elif nn == 3:
-                rect = patches.Rectangle((xlims[0],ylims[0]), params['a_c']-xlims[0], params['m_c']-ylims[0], color=colors[nn-1], alpha=0.2)
-                ax2.add_patch(rect)
-            elif nn == 4:
-                zmask = np.zeros(len(a_space[a_space>=params['a_c']]))
-                ax2.fill_between(a_space[a_space>=params['a_c']], zmask, np.real(mtst[a_space>=params['a_c'],0]), color=colors[nn-1], alpha=0.2)
-            elif nn == 5 or nn ==6:
-                m_cmask = np.ones(len(a_space[a_space>=params['a_c']])) * params['m_c']
-                ax2.fill_between(a_space[a_space>=params['a_c']], np.real(mtst[a_space>=params['a_c'],0]), m_cmask, color=colors[nn-1], alpha=0.2) # np.real(mtst[a_space>=params['a_c'],1]), color=colors[nn-1], alpha=0.2)
-            # elif nn == 6:
-            #     m_cmask = np.ones(len(a_space[a_space>=params['a_c']])) * params['m_c']
-            #     ax2[0].fill_between(a_space[a_space>=params['a_c']], m_cmask, np.real(mtst[a_space>=params['a_c'],1]), color=colors[nn-1], alpha=0.2)
-            else:
-                break
-    elif params['type'] == 'soft':
-        ax2[0].legend(loc='lower right')
-        for ni, nn in enumerate((np.arange(6)+1)):
-            if nn == 1:
-                rect = patches.Rectangle((xlims[0],ylims[0]), params['a_c']-xlims[0], params['m_c']-ylims[0], color=colors[nn-1], alpha=0.2)
-                ax2[0].add_patch(rect)
-            elif nn == 2:            
-                rect = patches.Rectangle((params['a_c'],xlims[0]),xlims[1]-params['a_c'], params['m_c'], color=colors[nn-1], alpha=0.2)
-                ax2[0].add_patch(rect)
-            elif nn == 3:                
-                rect = patches.Rectangle((xlims[0],params['m_c']),params['a_c']-xlims[0],ylims[1]-params['m_c'], color=colors[nn-1], alpha=0.2)
-                ax2[0].add_patch(rect)
-            elif nn == 4:
-                m_cmask = np.ones(len(a_space[a_space>=params['a_c']])) * ylims[1]
-                ax2[0].fill_between(a_space[a_space>=params['a_c']], m_cmask, np.real(mtst[a_space>=params['a_c'],0]), color=colors[nn-1], alpha=0.2)
-            elif nn == 5:
-                ax2[0].fill_between(a_space[a_space>=params['a_c']], np.real(mtst[a_space>=params['a_c'],1]), np.real(mtst[a_space>=params['a_c'],0]), color=colors[nn-1], alpha=0.2)
-            elif nn == 6:
-                zmask = np.ones(len(a_space[a_space>=params['a_c']])) * params['m_c']
-                ax2[0].fill_between(a_space[a_space>=params['a_c']], zmask, np.real(mtst[a_space>=params['a_c'],1]), color=colors[nn-1], alpha=0.2)               
-            else:
-                break
-
-        return ax2
-
-def plot_full_PD(params, resultsDF, colors = [mcolors['darkorange'], mcolors['red'], mcolors['navy'], mcolors['darkviolet'], mcolors['deepskyblue'], mcolors['springgreen']]):
-
-    # fig2, ax2 = plt.subplots(1,2,figsize=(12, 7), gridspec_kw={'width_ratios': [1, .35]})
-
-    if np.amax(resultsDF['m_profile']) / params['m0'] * 0.85 > params['m_c'] * 2 and np.amax(resultsDF['alpha_prof']) * 0.85 > params['a_c'] * 2:
-
-        ## double break
-        fig = plt.figure(constrained_layout=False, figsize=(10,8))
-        # gs_kw = dict(width_ratios=4, height_ratios=4)
-        gs = fig.add_gridspec(nrows=4,ncols=4) #, left=)
-        axBL = fig.add_subplot(gs[1:,:-1]) #, gridspec_kw=gs_kw)
-        axTL = fig.add_subplot(gs[0,:-1])
-        axTR = fig.add_subplot(gs[0,-1])
-        axBR = fig.add_subplot(gs[1:,-1])
-
-        axTL.spines['bottom'].set_visible(False)
-        axTL.spines['right'].set_visible(False)
-        axTL.xaxis.tick_top()
-        axTL.tick_params(labeltop=False)
-        axTL.get_xaxis().set_ticks([])
-
-        axBL.spines['top'].set_visible(False)
-        axBL.spines['right'].set_visible(False)
-        axBL.xaxis.tick_bottom()
-
-        axBR.spines['left'].set_visible(False)
-        axBR.spines['top'].set_visible(False)
-        axBR.yaxis.tick_left()
-        axBR.get_yaxis().set_ticks([])
-
-        axTR.spines['bottom'].set_visible(False)
-        axTR.spines['left'].set_visible(False)
-        axTR.xaxis.tick_top()
-        axTR.tick_params(labeltop=False)
-        axTR.get_xaxis().set_ticks([])
-        axTR.get_yaxis().set_ticks([])
-
-        axBL.set_xlim(0., params['a_c'] * 2 * 0.85)
-        axBL.set_ylim(0., params['m_c'] * 2 * 0.85)
-
-        axTL.set_xlim(axBL.get_xlim())
-        axTL.set_ylim(0.85 * resultsDF['m_profile'].max()/params['m0'], 1.05 * resultsDF['m_profile'].max()/params['m0'])
-
-        axBR.set_xlim(0.85 * resultsDF['alpha_prof'].max(), 1.05 * resultsDF['alpha_prof'].max())
-        axBR.set_ylim(axBL.get_ylim())
-        axBR.set_xticks([np.round(resultsDF['alpha_prof'].max(),1)])
-
-        axTR.set_xlim(axBR.get_xlim())
-        axTR.set_ylim(axTL.get_ylim())
-
-        axlist = [axBL, axTL, axBR, axTR]
-
-        for ai, aa in enumerate(axlist):
-
-            aa = subplot_PD(aa, params, colors)
-            axlist[ai] = aa
-
-        axTL.legend(loc='upper center', bbox_to_anchor=(0.7, 1.5), ncol=3)
-        # axBL.set_xlabel('\u03b1')
-        # axBL.set_ylabel('m/m0')
-
-        ### y-axis break
-        dX = .03
-        dY = .03
-
-        kwargs = dict(transform=axTL.transData, color='k', clip_on=False)
-        axTL.plot((np.amin(axTL.get_xlim())-dX, np.amin(axTL.get_xlim())+dX), (np.amin(axTL.get_ylim())-dY, np.amin(axTL.get_ylim())+dY), **kwargs)        # top-left diagonal
-
-        kwargs = dict(transform=axBL.transData, color='k', clip_on=False)
-        axBL.plot((np.amin(axBL.get_xlim())-dX, np.amin(axBL.get_xlim())+dX), (np.amax(axBL.get_ylim())-dY, np.amax(axBL.get_ylim())+dY), **kwargs)
-
-        kwargs = dict(transform=axBR.transData, color='k', clip_on=False)
-        axBR.plot((np.amax(axBR.get_xlim())-dX, np.amax(axBR.get_xlim())+dX), (np.amax(axBR.get_ylim())-dY, np.amax(axBR.get_ylim())+dY), **kwargs)
-
-        kwargs = dict(transform=axTR.transData, color='k', clip_on=False)
-        axTR.plot((np.amax(axTR.get_xlim())-dX, np.amax(axTR.get_xlim())+dX), (np.amin(axTR.get_ylim())-dY, np.amin(axTR.get_ylim())+dY), **kwargs)
-
-        
-        ### x axis break
-        dX = .03
-        dY = .03
-
-        kwargs = dict(transform=axTL.transData, color='k', clip_on=False)
-        axTL.plot((np.amax(axTL.get_xlim())-dX, np.amax(axTL.get_xlim())+dX), (np.amax(axTL.get_ylim())-dY, np.amax(axTL.get_ylim())+dY), **kwargs)        # top-left diagonal
-
-        kwargs = dict(transform=axBL.transData, color='k', clip_on=False)
-        axBL.plot((np.amax(axBL.get_xlim())-dX, np.amax(axBL.get_xlim())+dX), (np.amin(axBL.get_ylim())-dY, np.amin(axBL.get_ylim())+dY), **kwargs)
-
-        kwargs = dict(transform=axBR.transData, color='k', clip_on=False)
-        axBR.plot((np.amin(axBR.get_xlim())-dX, np.amin(axBR.get_xlim())+dX), (np.amin(axBR.get_ylim())-dY, np.amin(axBR.get_ylim())+dY), **kwargs)
-
-        kwargs = dict(transform=axTR.transData, color='k', clip_on=False)
-        axTR.plot((np.amin(axTR.get_xlim())-dX, np.amin(axTR.get_xlim())+dX), (np.amax(axTR.get_ylim())-dY, np.amax(axTR.get_ylim())+dY), **kwargs)
-
-    elif np.amax(resultsDF['m_profile']) / params['m0'] * 0.85 < params['m_c'] * 2 and np.amax(resultsDF['alpha_prof']) * 0.85 > params['a_c'] * 2:
-        ## horizontal break only
-        fig = plt.figure(constrained_layout=False, figsize=(10,8))
-        # gs_kw = dict(width_ratios=4, height_ratios=4)
-        gs = fig.add_gridspec(nrows=4,ncols=4) #, left=)
-        axBL = fig.add_subplot(gs[:,:-1]) #, gridspec_kw=gs_kw)
-        # axTL = fig.add_subplot(gs[0,:-1])
-        # axTR = fig.add_subplot(gs[0,-1])
-        axBR = fig.add_subplot(gs[:,-1])
-
-        axBL.spines['right'].set_visible(False)
-        axBL.xaxis.tick_bottom()
-
-        axBR.spines['left'].set_visible(False)
-        axBR.get_yaxis().set_ticks([])
-
-        axBL.set_xlim(0., params['a_c'] * 2 * 0.85)
-        axBL.set_ylim(0., params['m_c'] * 2 * 0.85)
-
-        axBR.set_xlim(0.85 * resultsDF['alpha_prof'].max(), 1.05 * resultsDF['alpha_prof'].max())
-        axBR.set_ylim(axBL.get_ylim())
-        axBR.set_xticks([np.round(resultsDF['alpha_prof'].max(),1)])
-
-        ### x axis break
-        dX = .03
-        dY = .03
-
-        kwargs = dict(transform=axBL.transData, color='k', clip_on=False)
-        axBL.plot((np.amax(axBL.get_xlim())-dX, np.amax(axBL.get_xlim())+dX), (np.amax(axBL.get_ylim())-dY, np.amax(axBL.get_ylim())+dY), **kwargs)        # top-left diagonal
-
-        kwargs = dict(transform=axBL.transData, color='k', clip_on=False)
-        axBL.plot((np.amax(axBL.get_xlim())-dX, np.amax(axBL.get_xlim())+dX), (np.amin(axBL.get_ylim())-dY, np.amin(axBL.get_ylim())+dY), **kwargs)
-
-        kwargs = dict(transform=axBR.transData, color='k', clip_on=False)
-        axBR.plot((np.amin(axBR.get_xlim())-dX, np.amin(axBR.get_xlim())+dX), (np.amin(axBR.get_ylim())-dY, np.amin(axBR.get_ylim())+dY), **kwargs)
-
-        kwargs = dict(transform=axBR.transData, color='k', clip_on=False)
-        axBR.plot((np.amin(axBR.get_xlim())-dX, np.amin(axBR.get_xlim())+dX), (np.amax(axBR.get_ylim())-dY, np.amax(axBR.get_ylim())+dY), **kwargs)
-
-        axlist = [axBL, axBR]
-
-        for ai, aa in enumerate(axlist):
-
-            aa = subplot_PD(aa, params, colors)
-            axlist[ai] = aa
-
-        axBL.legend(loc='upper center', bbox_to_anchor=(0.7, 1.5), ncol=3)
-
-    elif np.amax(resultsDF['m_profile']) / params['m0'] * 0.85 > params['m_c'] * 2 and np.amax(resultsDF['alpha_prof']) * 0.85 < params['a_c'] * 2:
-        ## vertical break only
-        fig = plt.figure(constrained_layout=False, figsize=(10,8))
-        # gs_kw = dict(width_ratios=4, height_ratios=4)
-        gs = fig.add_gridspec(nrows=4,ncols=4) #, left=)
-        axBL = fig.add_subplot(gs[1:,:]) #, gridspec_kw=gs_kw)
-        axTL = fig.add_subplot(gs[0,:])
-
-        axTL.spines['bottom'].set_visible(False)
-        axTL.xaxis.tick_top()
-        axTL.tick_params(labeltop=False)
-        axTL.get_xaxis().set_ticks([])
-
-        axBL.spines['top'].set_visible(False)
-        axBL.xaxis.tick_bottom()
-        axBL.set_xlim(0., params['a_c'] * 2 * 0.85)
-        axBL.set_ylim(0., params['m_c'] * 2 * 0.85)
-
-        axTL.set_xlim(axBL.get_xlim())
-        axTL.set_ylim(0.85 * resultsDF['m_profile'].max()/params['m0'], 1.05 * resultsDF['m_profile'].max()/params['m0'])
-
-        ### y-axis break
-        dT = .03 * np.diff(axBL.get_ylim())
-        dB = .03 * np.diff(axBL.get_ylim())
-
-        kwargs = dict(transform=axTL.transData, color='k', clip_on=False)
-        axTL.plot((np.amin(axTL.get_xlim())-dT, np.amin(axTL.get_xlim())+dT), (np.amin(axTL.get_ylim())-dT, np.amin(axTL.get_ylim())+dT), **kwargs)        # top-left diagonal
-
-        kwargs = dict(transform=axBL.transData, color='k', clip_on=False)
-        axBL.plot((np.amin(axBL.get_xlim())-dB, np.amin(axBL.get_xlim())+dB), (np.amax(axBL.get_ylim())-dB, np.amax(axBL.get_ylim())+dB), **kwargs)
-
-        kwargs = dict(transform=axBL.transData, color='k', clip_on=False)
-        axBL.plot((np.amax(axBL.get_xlim())-dB, np.amax(axBL.get_xlim())+dB), (np.amax(axBL.get_ylim())-dB, np.amax(axBL.get_ylim())+dB), **kwargs)
-
-        kwargs = dict(transform=axTL.transData, color='k', clip_on=False)
-        axTL.plot((np.amax(axTL.get_xlim())-dT, np.amax(axTL.get_xlim())+dT), (np.amin(axTL.get_ylim())-dT, np.amin(axTL.get_ylim())+dT), **kwargs)
-
-        axlist = [axBL, axTL]
-
-        for ai, aa in enumerate(axlist):
-
-            aa = subplot_PD(aa, params, colors)
-            axlist[ai] = aa
-
-        axTL.legend(loc='upper center', bbox_to_anchor=(0.7, 1.5), ncol=3)
-
-    else:
-        ## no break
-        fig, ax = plt.subplots(1,1,figsize=(8, 8)) #, gridspec_kw={'width_ratios': [1, .35]})
-        # axlist = [ax]
-        ax = subplot_PD(ax, params, colors)
-
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.13), ncol=3)
-        ax.set_xlabel('\u03b1')
-        ax.set_ylabel('m/m0')
-
-        axlist = [ax]
-
-
-    
-
-    # ax2[0].plot(a,m / params['m0'],color=mcolors['black'])
-    # mred = np.concatenate((m[np.abs(np.diff(m, prepend=0))>0], m[np.abs(np.diff(m, append=0))>0]))
-    # ared = np.concatenate((a[np.abs(np.diff(m, prepend=0))>0], a[np.abs(np.diff(m, append=0))>0]))
-    # tred = np.concatenate((t[np.abs(np.diff(m, prepend=0))>0], t[np.abs(np.diff(m, append=0))>0]))
-
-    # ax[1].scatter(tred, mred / params['m0'], color='r', s=120, zorder=50)
-    # ax2[0].scatter(ared, mred / params['m0'], color='r', s=120, zorder=50)
-
-    # priming_times, memory_times, stiffP, stiffA = summary_stats(a, x, m, t, params)
-    # mech_stats = np.abs(stiffP - stiffA) / params['m0']
-
-    # labels = ['${t_{prime}}/{t_{memory}}$', '$m_{diff}$']
-    # barx = np.arange(len(labels))
-    # barlist = ax2[1].bar(barx, [np.mean(priming_times / memory_times), mech_stats])
-    # barlist[0].set_color('g')
-    # barlist[1].set_color('k')
-    # ax2[1].set_xticks(barx)
-    # ax2[1].set_xticklabels(labels)
-
-    # plt.tight_layout()
-
-    return fig, axlist
 
 def add_m_traj(ax, a, m, t, params):
         
@@ -432,61 +89,63 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     ax[0].callbacks.connect("xlim_changed", update_days_axis)
     ax_dys.set_xlabel('time (days)')
     ### x and alpha plot
-    atwin = ax[0].twinx() #atwin for alpha
-    # lc1 = ax[0].plot(t, x, linewidth=4., color='k', label='x', zorder=10);
-    lc1 = ax[0].plot(t, x, linewidth=4., color=params['color'], label='x', zorder=10);
+    atwin = ax[1].twinx() #atwin for alpha
+    # lc1 = ax[1].plot(t, x, linewidth=4., color='k', label='x', zorder=10);
+    lc1 = ax[1].plot(t, x, linewidth=4., color=params['color'], label='x', zorder=10);
     lc2 = atwin.plot(t, a, linewidth=4., color = mcolors['green'], label='\u03b1', zorder=5);
     atwin.set_ylabel('\u03b1')
     atwin.yaxis.label.set_color(mcolors['green'])
     atwin.tick_params(axis='y', colors=mcolors['green'])
 
-    ax[0].set_ylabel('x')
-    ax[0].set_ylim([0, np.amax(x)*1.05])
+    ax[1].set_ylabel('x')
+    ax[1].set_ylim([0, np.amax(x)*1.05])
 
-    ax[0].yaxis.label.set_color(params['color'])
-    ax[0].tick_params(axis='y', colors=params['color'])
+    ax[1].yaxis.label.set_color(params['color'])
+    ax[1].tick_params(axis='y', colors=params['color'])
 
     ax[0].set_xticks([])
 
     ## a_max
-    # lc4 = ax[0].plot([t[0],t[-1]],[params['a_max'],params['a_max']],color = mcolors['firebrick'], linestyle='-.', linewidth=2., label='\u03b1$_{max}$', zorder=4)
+    # lc4 = ax[1].plot([t[0],t[-1]],[params['a_max'],params['a_max']],color = mcolors['firebrick'], linestyle='-.', linewidth=2., label='\u03b1$_{max}$', zorder=4)
 
     ## a_c
     lc3 = atwin.plot([t[0],t[-1]],[params['a_c'][mc_ind],params['a_c'][mc_ind]],color = mcolors['green'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$', zorder=4)
     ## x_c
-    # ax[0].plot([t[0],t[-1]],[params['x_c'],params['x_c']],color = mcolors['black'], linestyle='-.', linewidth=2., label='x$_{c}$', zorder=4)
+    # ax[1].plot([t[0],t[-1]],[params['x_c'],params['x_c']],color = mcolors['black'], linestyle='-.', linewidth=2., label='x$_{c}$', zorder=4)
 
     ## legend
     lns = lc1+lc2+lc3 #+ lc4
     labs = [l.get_label() for l in lns]
-    ax[0].legend(lns, labs, loc=0)
-    # ax[0].set_xlabel('time (hours)')
-    # ax[0].yaxis.label.set_color('k')
-    # ax[0].tick_params(axis='y', colors='k')
+    ax[1].legend(lns, labs, loc=0)
+    # ax[1].set_xlabel('time (hours)')
+    # ax[1].yaxis.label.set_color('k')
+    # ax[1].tick_params(axis='y', colors='k')
     
     for ci, cc in enumerate(cumsum):
         # print(ids)
         # print(cumsum)
         # print(dt)
-        ax[0].plot([cc*dt, cc*dt],ax[0].get_ylim(),color=colors[ids[ci]-1], linestyle='-.', alpha = 0.8, zorder=0)
+        ax[1].plot([cc*dt, cc*dt],ax[1].get_ylim(),color=colors[ids[ci]-1], linestyle='-.', alpha = 0.8, zorder=0)
     
     ### m plot
-    ax[1].set_ylim([np.amin(m / params['m0'])*0.8,np.amax(m / params['m0'])*1.1])
-    # ax[1].plot(t, m/params['m0'], color = mcolors['black'], linewidth = 3., label='m')
-    ax[1].plot(t, m/params['m0'], color = params['color'], linewidth = 3., label='m')
-    ax[1].plot([t[0],t[-1]],[params['m_c'], params['m_c']], color = 'k', linestyle='-.', label='$m_{c}$')
+    ax[0].set_ylim([np.amin(m / params['m0'])*0.8,np.amax(m / params['m0'])*1.1])
+    # ax[0].plot(t, m/params['m0'], color = mcolors['black'], linewidth = 3., label='m')
+    ax[0].plot(t, m/params['m0'], color = params['color'], linewidth = 3., label='m')
+    ax[0].plot([t[0],t[-1]],[params['m_c'], params['m_c']], color = 'k', linestyle='-.', label='$m_{c}$')
     
     # /params['m0']
-    # ax[1].plot([params['tau_F']*4,params['tau_F']*4],ax[1].get_ylim(), color = mcolors['red'], linestyle = '-.', linewidth = 2)
+    # ax[0].plot([params['tau_F']*4,params['tau_F']*4],ax[0].get_ylim(), color = mcolors['red'], linestyle = '-.', linewidth = 2)
 
     ## adjusted for initial burn-in.
-    # ax[1].plot([params['t_prime'][0]+24, params['t_prime'][0]+24],ax[1].get_ylim(), color = mcolors['red'], linestyle = '-.', linewidth = 2)
+    # ax[0].plot([params['t_prime'][0]+24, params['t_prime'][0]+24],ax[0].get_ylim(), color = mcolors['red'], linestyle = '-.', linewidth = 2)
     ## this above is plotting on the top axis now instead of the bottom
-    # ax[1].plot([params['t1max'][0], params['t1max'][0]],ax[1].get_ylim(), color = mcolors['red'], linestyle = '-.', linewidth = 2)
+    # ax[0].plot([params['t1max'][0], params['t1max'][0]],ax[0].get_ylim(), color = mcolors['red'], linestyle = '-.', linewidth = 2)
 
     ax[1].set_xlabel('time (hours)')
     ax[1].set_ylabel('m/m0')
-    ax[1].legend(loc=1)
+    ax[0].legend(loc=1)
+
+
     
     print('timesteps per region:', end=" "); print(count); 
     print('regions:', end=" "); print(ids)
@@ -494,32 +153,128 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     print(params['time_to_AC'])
     
     for ni, nn in enumerate(ids):
-        rect = patches.Rectangle((cumsum[ni]*dt,ax[1].get_ylim()[0]), count[ni]*dt, np.diff(ax[1].get_ylim()), color=colors[nn-1], alpha=0.2)
+        rect = patches.Rectangle((cumsum[ni]*dt,ax[0].get_ylim()[0]), count[ni]*dt, np.diff(ax[0].get_ylim()), color=colors[nn-1], alpha=0.2)
         #### ragged list warnings happen below ####
         ### plt error.. 
-        ax[1].add_patch(rect)
+        ax[0].add_patch(rect)
     
-    ### phase diagram plot
-    fig.tight_layout()
+    # ### phase diagram plot
+    # fig.tight_layout()
 
-    if plot_PD:
-        # print('here')
-        fig2, axs = plot_full_PD(params, resultsDF, colors=[mcolors['darkorange'], mcolors['red'], mcolors['navy'], mcolors['navy'], mcolors['springgreen'], mcolors['springgreen']])
-        for ai, aa in enumerate(axs):
+    # if plot_PD:
+    #     # print('here')
+    #     fig2, axs = plot_full_PD(params, resultsDF, colors=[mcolors['darkorange'], mcolors['red'], mcolors['navy'], mcolors['navy'], mcolors['springgreen'], mcolors['springgreen']])
+    #     for ai, aa in enumerate(axs):
 
-            aa, ared, mred, tred = add_m_traj(aa, a, m, t, params)
-            priming_times, memory_times, stiffP, stiffA = summary_stats(resultsDF, params, False)
-    else:
-        # print('there')
-        _, ared, mred, tred = add_m_traj(None, a, m, t, params)
-        fig2 = None
-        axs = None
+    #         aa, ared, mred, tred = add_m_traj(aa, a, m, t, params)
+    #         priming_times, memory_times, stiffP, stiffA = summary_stats(resultsDF, params, False)
+    # else:
+    #     # print('there')
+    #     _, ared, mred, tred = add_m_traj(None, a, m, t, params)
+    #     fig2 = None
+    #     axs = None
 
-    ax[1].scatter(tred, mred / params['m0'], color=params['color'], s=120, zorder=50)    
+    # ax[0].scatter(tred, mred / params['m0'], color=params['color'], s=120, zorder=50)    
 
     # plt.tight_layout()
     
-    return params, fig, fig2, axs
+    return params, fig, ax # fig2,
+    
+
+def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, params):
+
+    a_c = np.array(params['a_c'])
+    m_c = params['m_c']
+    mc_ind = np.where(np.abs(m_space/ params['m0'] - m_c) == np.amin(np.abs(m_space/ params['m0']-m_c)))[0][0]
+
+    gfig = go.Figure().update_layout(
+            template="simple_white",
+            width=700, height=600,
+            xaxis = dict(range=[0., 3.], mirror=True, showline=True),
+            yaxis = dict(range=[np.amin(capture_mvals), 1.5], mirror=True, showline=True),
+            font=dict(
+                # family="Courier New, monospace",
+                size=18,
+                # color="RebeccaPurple"
+                ),
+                paper_bgcolor='rgba(0,0,0,0)',
+                  plot_bgcolor='rgba(0,0,0,0)'
+            )
+
+    xlims = gfig.layout.xaxis.range; ylims = gfig.layout.yaxis.range
+    capture_mvals = np.array(capture_mvals)
+
+
+    #### fills
+
+    ## bottom
+    xx = np.concatenate((capture2minima, capmax, )) # np.array([xlims[1], np.amin(capture2minima)])
+    yy = np.concatenate((capture_mvals, capture_mvals,)) / params['m0'] #  np.array([ylims[0], ylims[0]])
+
+    gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]), 
+                              y=np.append(np.array(capture_mvals)/params['m0'], [m_c]),
+                        mode='none',  fill='tozerox', fillcolor='rgba(148, 0,211, 0.3)'
+                        )
+                  )
+    gfig.add_trace(go.Scatter(x=capmax, 
+                             y=capture_mvals / params['m0'],
+                        mode='none', fill='tonextx', fillcolor='rgba(3, 255,127, 0.3)'
+                             )
+                  )
+    ## top
+    # xx = [np.amax(a_c), xlims[1], xlims[1], a_c[mc_ind]]
+    # xx = np.concatenate((
+    #     a_c[m_space/params['m0']>m_c], [xlims[1], xlims[1]], capmax
+    # ))
+
+    # yy = [m_space[-1]/params['m0'], m_space[-1]/params['m0'], np.amin(capmax)/params['m0'], m_c]
+    # yy = np.concatenate((
+    #     m_space/params['m0'], [m_space[-1]/params['m0'], np.amin(capture_mvals)/params['m0']], capture_mvals
+    # ))
+    # gfig.add_trace(go.Scatter(
+    #                     x=xx,
+    #                     y=yy,
+    #                     mode='none', fill='toself', fillcolor='rgba(255, 0, 0, 0.3)'
+    #                 )
+    # #                                      line=dict(color='green', width=4))
+    #               )
+
+    gfig.add_trace(go.Scatter(
+                        x=np.concatenate((a_c[m_space/params['m0']>m_c], np.array([a_space[0]]))),
+                        y=np.concatenate((m_space[m_space/params['m0']>m_c], np.array([m_space[-1]]))) / params['m0'],
+                        mode='none', fill='tozerox', fillcolor='rgba(255, 140, 34, 0.3)'
+                    )
+    #                                      line=dict(color='green', width=4))
+                  )
+
+
+    #### lines
+    gfig.add_trace(go.Scatter(
+                        x=a_c,
+                        y=m_space / params['m0'],
+                        mode='lines', line=dict(color='green', width=4)
+                        )              
+                  )
+
+    gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]),
+                              y=np.append(np.array(capture_mvals), [m_space[mc_ind]]) / params['m0'],
+                        mode='lines',line=dict(color='blue', width=4),
+                             )
+                  )
+
+    gfig.add_trace(go.Scatter(x=[np.amin(a_space), a_c[mc_ind]], y=[m_c, m_c],
+                        mode='lines', line=dict(color='red', width=4),
+                             )
+                  )
+
+    gfig.add_trace(go.Scatter(x=np.append(capmax, a_c[mc_ind]), 
+                             y=np.append(np.array(capture_mvals), m_space[mc_ind]) / params['m0'],
+                        mode='lines', line=dict(color='red', width=4),
+                             )
+                  )
+
+    return gfig
+
 
 
 def plot_memcorr(memDF, subcols, prettylabel, ax):

@@ -21,6 +21,7 @@ import cmath
 import matplotlib.patches as patches
 from matplotlib import colors as m2colors
 
+from numpy.random import Generator, PCG64
 # import warnings
 # ## importing and doing this to ignore warning in plt add_patch
 # warnings.filterwarnings("ignore", category=DeprecationWarning) 
@@ -28,6 +29,15 @@ from matplotlib import colors as m2colors
 cwd = os.getcwd()
 sns.set(style="ticks", font_scale=1.5)
 mcolors = dict(m2colors.BASE_COLORS, **m2colors.CSS4_COLORS)
+
+class noise:
+    def __init__(self, mean=0., std = 1., mag = 0.1):
+        self.mean = mean
+        self.std = std
+        self.mag = mag
+        self.rg = Generator(PCG64())
+    def draw(self):
+        return self.mag * self.rg.normal(self.mean, self.std)
 
 def f_m(m, params):
     if isinstance(params['type'], str):
@@ -49,8 +59,8 @@ def f_m(m, params):
             return params['type']
 
 def x_total(a, params):
-    # fix x_total at a = a0 to 1.
-    return params['xtt'] * (a - params['a0']) + 1. #params['x0']
+    # fix x_total to some value x0.
+    return params['xtt'] * (a - params['a0']) + params['x0']
 
 def U(fm, m, x, a, params):
     km = fm(m, {'type':params['km'], 'm0':params['m0']})
@@ -142,76 +152,76 @@ def build_mprof(inarr, res):
 
     return np.array(m)
 
-def m_solve_real_positives(x_lim, a_current, n_current, tau, stype):
+# def m_solve_real_positives(x_lim, a_current, n_current, tau, stype):
 
-    # print(a_current)
-    # print(x_lim)
-    x_space = np.linspace(0, np.amax([int(x_lim), 5.]), int(x_lim * 5000))
+#     # print(a_current)
+#     # print(x_lim)
+#     x_space = np.linspace(0, np.amax([int(x_lim), 5.]), int(x_lim * 5000))
 
-    solcands = 1 + x_space**n_current - np.sqrt(n_current * a_current * tau * x_space**(n_current-1))
-    # restricted to real positives, get the two smallest roots.
-    # root_inds = np.argpartition(np.abs(solcands),2)
-    root_inds = np.insert((np.diff(np.sign(solcands)) != 0),0,0)
-    # print(np.sum(root_inds))
-    roots = np.array(sorted(x_space[root_inds]))
-    # print(roots)
-    if stype == 'stiff':
-        m_roots = np.round(-np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
-    elif stype == 'soft':
-        m_roots = np.round(-1 / np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
-        # if m_roots[1] < 0:
-        #     print(x_lim)
-        #     print(a_current)
-        #     print(m_roots)
-        #     print(roots)
-        #     sys.exit()
+#     solcands = 1 + x_space**n_current - np.sqrt(n_current * a_current * tau * x_space**(n_current-1))
+#     # restricted to real positives, get the two smallest roots.
+#     # root_inds = np.argpartition(np.abs(solcands),2)
+#     root_inds = np.insert((np.diff(np.sign(solcands)) != 0),0,0)
+#     # print(np.sum(root_inds))
+#     roots = np.array(sorted(x_space[root_inds]))
+#     # print(roots)
+#     if stype == 'stiff':
+#         m_roots = np.round(-np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
+#     elif stype == 'soft':
+#         m_roots = np.round(-1 / np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
+#         # if m_roots[1] < 0:
+#         #     print(x_lim)
+#         #     print(a_current)
+#         #     print(m_roots)
+#         #     print(roots)
+#         #     sys.exit()
 
-    if len(roots) < 2:
-        ## this is where several trials are hanging
-        print('num roots < 2 breaking')
-        print(roots)
-        print(m_roots)
-        print(x_lim)
-        print(a_current)
-        print(tau)
+#     if len(roots) < 2:
+#         ## this is where several trials are hanging
+#         print('num roots < 2 breaking')
+#         print(roots)
+#         print(m_roots)
+#         print(x_lim)
+#         print(a_current)
+#         print(tau)
 
-        return np.NaN, np.NaN
+#         return np.NaN, np.NaN
 
-        # print(root_inds)
-        # print(roots)
-        # print(m_roots)
-        # print(np.array(sorted(x_space[root_inds][0:3])))
-        # plt.plot(x_space, solcands)
-        # plt.plot(plt.xlim(),[0,0])
-        # plt.show()
-        # sys.exit()
-    # print(m_roots)
-    # if len(m_roots) != 2 or np.amax(m_roots) < 0 or roots[0] in [0,len(x_space)] or roots[1] in [0,len(x_space)] or m_roots[0] == m_roots[1]:
-    #     print(m_roots)
+#         # print(root_inds)
+#         # print(roots)
+#         # print(m_roots)
+#         # print(np.array(sorted(x_space[root_inds][0:3])))
+#         # plt.plot(x_space, solcands)
+#         # plt.plot(plt.xlim(),[0,0])
+#         # plt.show()
+#         # sys.exit()
+#     # print(m_roots)
+#     # if len(m_roots) != 2 or np.amax(m_roots) < 0 or roots[0] in [0,len(x_space)] or roots[1] in [0,len(x_space)] or m_roots[0] == m_roots[1]:
+#     #     print(m_roots)
         
-    #     print('symbolic solve, check')
-    #     alpha, x, n, tauv = sympy.symbols('alpha x n tauv')
-    #     eqn = sympy.Eq(1 + x**n, sympy.sqrt(alpha * n * tauv * x**(n-1)))
+#     #     print('symbolic solve, check')
+#     #     alpha, x, n, tauv = sympy.symbols('alpha x n tauv')
+#     #     eqn = sympy.Eq(1 + x**n, sympy.sqrt(alpha * n * tauv * x**(n-1)))
 
-    #     eqn = eqn.subs(n, n_current)
-    #     eqn = eqn.subs(alpha, a_current)
-    #     eqn = eqn.subs(tauv, tau)
+#     #     eqn = eqn.subs(n, n_current)
+#     #     eqn = eqn.subs(alpha, a_current)
+#     #     eqn = eqn.subs(tauv, tau)
 
-    #     sol = sympy.solve(eqn, x, force=True)
+#     #     sol = sympy.solve(eqn, x, force=True)
 
-    #     roots = np.array([s for s in sol if s.is_real]).astype(np.float64)
-    #     # print(type(roots[0]))
-    #     roots = roots[roots > 0]
-    #     # print(roots)
-    #     # print(type(roots))
-    #     if stype == 'stiff':
-        #     m_roots = np.round(-np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
-        # elif stype == 'soft':
-        #     m_roots = np.round(-1 / np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
+#     #     roots = np.array([s for s in sol if s.is_real]).astype(np.float64)
+#     #     # print(type(roots[0]))
+#     #     roots = roots[roots > 0]
+#     #     # print(roots)
+#     #     # print(type(roots))
+#     #     if stype == 'stiff':
+#         #     m_roots = np.round(-np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
+#         # elif stype == 'soft':
+#         #     m_roots = np.round(-1 / np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
 
-    #     print(m_roots)
-    # returns m1/m0, m2/m0, where m1 is smaller than m2
-    return m_roots[1], m_roots[0]
+#     #     print(m_roots)
+#     # returns m1/m0, m2/m0, where m1 is smaller than m2
+#     return m_roots[1], m_roots[0]
 
 def rle(inarray):
         """ run length encoding. Partial credit to R rle function. 
@@ -228,25 +238,25 @@ def rle(inarray):
             p = np.cumsum(np.append(0, z))[:-1] # positions
             return(z, p, ia[i])
 
-def calc_PD(params):
+# def calc_PD(params):
     
-    if 'x_max' not in params.keys():
-        params['x_max'] = params['x0']
+#     if 'x_max' not in params.keys():
+#         params['x_max'] = params['x0']
 
-    mtst = np.zeros((5000,2)) # + 0j
-    a_space = np.linspace(0, params['a_max']+1, 5000)
-    for ai, aa in enumerate(a_space):
-        # pd in m/m0
-        # mtst[ai,0] = m1n3(aa, n) # * params['m0']
-        # mtst[ai,1] = m2n3(aa, n) # * params['m0']
-        if aa >= params['a_c']:
-            ## for 'soft' this part is problematic, since one of the roots flips to negative at singularity.
-            mtst[ai,:] = m_solve_real_positives(params['x_max']*1.5, aa, params['n'], params['tau'], params['type'])
-    # sum and divide complex conjugate roots under a0
-    # mtst[a_space < params['a_c'],0] = np.sum(mtst[a_space < params['a_c'],:],axis=1)/2
-    # mtst[a_space < params['a_c'],1] = np.sum(mtst[a_space < params['a_c'],:],axis=1)/2
+#     mtst = np.zeros((5000,2)) # + 0j
+#     a_space = np.linspace(0, params['a_max']+1, 5000)
+#     for ai, aa in enumerate(a_space):
+#         # pd in m/m0
+#         # mtst[ai,0] = m1n3(aa, n) # * params['m0']
+#         # mtst[ai,1] = m2n3(aa, n) # * params['m0']
+#         if aa >= params['a_c']:
+#             ## for 'soft' this part is problematic, since one of the roots flips to negative at singularity.
+#             mtst[ai,:] = m_solve_real_positives(params['x_max']*1.5, aa, params['n'], params['tau'], params['type'])
+#     # sum and divide complex conjugate roots under a0
+#     # mtst[a_space < params['a_c'],0] = np.sum(mtst[a_space < params['a_c'],:],axis=1)/2
+#     # mtst[a_space < params['a_c'],1] = np.sum(mtst[a_space < params['a_c'],:],axis=1)/2
 
-    return a_space, mtst
+#     return a_space, mtst
 
 def calc_PD_rates(params):
 
@@ -304,10 +314,14 @@ def update_alpha(t_region, alpha, params):
     else:
         dalpha = 0.    
 
-    return dalpha
+    return dalpha + params['eps'].draw()
 
 
 def integrate_profile(m_profile, t_space, params, resultsDF):
+
+    if 'eps' not in params.keys():
+        params['eps'] = (0., 1., 0.)
+    params['eps'] = noise(params['eps'][0], params['eps'][1], params['eps'][2])
 
     # print('enter')
     kmdict = {'type':params['km'], 'm0':params['m0']}
@@ -333,7 +347,7 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
         current_m_ind = np.where(np.abs(params['m_space'] - m_profile[ti]) == np.amin(np.abs(params['m_space'] - m_profile[ti])))[0][0]
 
         if ti == 0:
-            x_prof[ti] = params['x0']
+            x_prof[ti] = scipy.optimize.fsolve(x_equil, 1., args=(m_profile[ti], params['a0'], params), xtol=1e-10)[0]
             alpha_prof[ti] = params['a0']
             continue;
 
@@ -585,17 +599,17 @@ def summary_stats(resultsDF, params, verbose=True):
     def slice_tuple(slice_):
         return [slice_.start, slice_.stop, slice_.step]
 
-    if 'type' not in params.keys():
-        print('assuming stiff')
-        print('summary')
-        params['type'] = 'stiff'
+    # if 'type' not in params.keys():
+    #     print('assuming stiff')
+    #     print('summary')
+    #     params['type'] = 'stiff'
 
     # take the time series arrays and calculate observables.
     dt = t[1] - t[0]
 
-    if params['type'] == 'stiff':
+    if params['km'] == 'stiff':
         priming_mask = m / params['m0'] > params['m_c']
-    elif params['type'] == 'soft':
+    elif params['km'] == 'soft':
         priming_mask = m / params['m0'] < params['m_c']
     else:
         print('no type')
