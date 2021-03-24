@@ -52,6 +52,8 @@ def f_m(m, params):
         if params['type'] == '-stiff':
             inv_og_tau = 1.
             return -(1 - np.exp(-m/params['m0'])) + inv_og_tau
+        # if params['type'] == 'switch':
+        #     return m/params['m0'] * 
     else:
         if isinstance(m, np.ndarray):
             return params['type'] * np.ones(len(m))
@@ -65,10 +67,10 @@ def x_total(a, params):
 def U(fm, m, x, a, params):
     km = fm(m, {'type':params['km'], 'm0':params['m0']})
     kc = fm(m, {'type':params['kc'], 'm0':params['m0']})
-    return (-km * x_total(a, params) - a) * x + x**2/2 * (km + kc) + a * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n'])
-
-def U_old(fm, m, x, a, params):
-    return -fm(m, params)*x + x**2/(2*params['tau']) - a/(params['n']+1)*x**(params['n']+1) * scipy.special.hyp2f1(1, (params['n']+1)/params['n'], (2*params['n']+1)/params['n'], -x**params['n'])
+    return (
+        (-km * x_total(a, params) - a) * x + x**2/2 * (km + kc) + a * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n']) 
+        + m * x * scipy.special.hyp2f1(1, 1/params['g'], 1+1/params['g'], -x**params['g'])
+    )
 
 def x_crit(n):
     return ((n-1)/(n+1))**(1/n)
