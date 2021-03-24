@@ -242,7 +242,7 @@ def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, param
     gfig.add_trace(go.Scatter(
                         x=np.concatenate((a_c[m_space/params['m0']>m_c], np.array([a_space[0]]))),
                         y=np.concatenate((m_space[m_space/params['m0']>m_c], np.array([m_space[-1]]))) / params['m0'],
-                        mode='none', fill='tozerox', fillcolor='rgba(255, 140, 34, 0.3)'
+                        mode='none', fill='tozerox', fillcolor='rgba(148, 0,211, 0.3)'
                     )
     #                                      line=dict(color='green', width=4))
                   )
@@ -250,11 +250,18 @@ def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, param
 
     #### lines
     gfig.add_trace(go.Scatter(
-                        x=a_c,
-                        y=m_space / params['m0'],
+                        x=a_c[a_c >= a_c[mc_ind]],
+                        y=m_space[a_c >= a_c[mc_ind]] / params['m0'],
                         mode='lines', line=dict(color='green', width=4)
                         )              
                   )
+
+    # gfig.add_trace(go.Scatter(
+    #                     x=a_c[a_c <= a_c[mc_ind]],
+    #                     y=m_space[a_c <= a_c[mc_ind]] / params['m0'],
+    #                     mode='lines', line=dict(color='green', width=4, dash='dot')
+    #                     )              
+    #               )
 
     gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]),
                               y=np.append(np.array(capture_mvals), [m_space[mc_ind]]) / params['m0'],
@@ -262,8 +269,8 @@ def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, param
                              )
                   )
 
-    gfig.add_trace(go.Scatter(x=[np.amin(a_space), a_c[mc_ind]], y=[m_c, m_c],
-                        mode='lines', line=dict(color='red', width=4),
+    gfig.add_trace(go.Scatter(x=[np.amin(a_space), np.amax(a_space)], y=[m_c, m_c], # a_c[mc_ind]
+                        mode='lines', line=dict(color='red', width=4, dash='dot'),
                              )
                   )
 

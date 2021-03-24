@@ -143,7 +143,7 @@ params = set_params_rates()
 # params['input_m'].append(ins.tolist())
 start = timeit.default_timer()
 
-numtrials = np.arange(128)
+numtrials = np.arange(512)
 
 memappend = [];
 
