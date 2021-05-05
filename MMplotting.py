@@ -4,7 +4,8 @@ import math
 import numpy as np
 import scipy
 from scipy.signal import argrelextrema
-import scipy.ndimage as nd
+# from scipy.interpolate import griddata
+# import scipy.ndimage as nd
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,7 +25,7 @@ import cmath
 import matplotlib.patches as patches
 from matplotlib import colors as m2colors
 
-from MMfxns import *
+# from MMfxns import x_equil, rle
 
 cwd = os.getcwd()
 sns.set(style="ticks", font_scale=1.5)
@@ -81,6 +82,13 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
 
     mc_ind = np.where(np.abs(m_space/ params['m0'] - params['m_c']) == np.amin(np.abs(m_space/ params['m0'] - params['m_c'])))[0][0]
     
+    x_baseline = np.zeros(len(x))
+    for mi, mm in enumerate(m):
+        if mi > 0:
+            x_baseline[mi] = scipy.optimize.fsolve(x_equil, x_baseline[mi-1], args=(mm, params['a0'], params), xtol=1e-10)[0]
+        else:
+            x_baseline[mi] = scipy.optimize.fsolve(x_equil, 1., args=(mm, params['a0'], params), xtol=1e-10)[0]
+
     dt = t[1] - t[0]
         
     count, cumsum, ids = rle(active_region)    
@@ -92,10 +100,12 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     atwin = ax[1].twinx() #atwin for alpha
     # lc1 = ax[1].plot(t, x, linewidth=4., color='k', label='x', zorder=10);
     lc1 = ax[1].plot(t, x, linewidth=4., color=params['color'], label='x', zorder=10);
+    lc4 = ax[1].plot(t, x_baseline, linewidth=2., color=params['color'], linestyle = '-.', label='$x_{ref}$', zorder=10);
     lc2 = atwin.plot(t, a, linewidth=4., color = mcolors['green'], label='\u03b1', zorder=5);
     atwin.set_ylabel('\u03b1')
     atwin.yaxis.label.set_color(mcolors['green'])
     atwin.tick_params(axis='y', colors=mcolors['green'])
+    atwin.set_ylim([0,np.amax(a)*1.05])
 
     ax[1].set_ylabel('x')
     ax[1].set_ylim([0, np.amax(x)*1.05])
@@ -109,14 +119,15 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     # lc4 = ax[1].plot([t[0],t[-1]],[params['a_max'],params['a_max']],color = mcolors['firebrick'], linestyle='-.', linewidth=2., label='\u03b1$_{max}$', zorder=4)
 
     ## a_c
-    lc3 = atwin.plot([t[0],t[-1]],[params['a_c'][mc_ind],params['a_c'][mc_ind]],color = mcolors['green'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$', zorder=4)
+    # lc3 = atwin.plot([t[0],t[-1]],[params['a_c'][mc_ind],params['a_c'][mc_ind]],color = mcolors['green'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$', zorder=4)
     ## x_c
-    # ax[1].plot([t[0],t[-1]],[params['x_c'],params['x_c']],color = mcolors['black'], linestyle='-.', linewidth=2., label='x$_{c}$', zorder=4)
+    lc3 = ax[1].plot([t[0],100],[params['x_c'],params['x_c']],color = mcolors['lime'], linestyle='--', linewidth=2., label='x$_{c}$', zorder=4)
+
 
     ## legend
-    lns = lc1+lc2+lc3 #+ lc4
+    lns = lc1+lc2 +lc4 #+ lc4
     labs = [l.get_label() for l in lns]
-    ax[1].legend(lns, labs, loc=0)
+    ax[1].legend(lns, labs, loc='lower right')
     # ax[1].set_xlabel('time (hours)')
     # ax[1].yaxis.label.set_color('k')
     # ax[1].tick_params(axis='y', colors='k')
@@ -125,13 +136,15 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
         # print(ids)
         # print(cumsum)
         # print(dt)
-        ax[1].plot([cc*dt, cc*dt],ax[1].get_ylim(),color=colors[ids[ci]-1], linestyle='-.', alpha = 0.8, zorder=0)
+        if ci == 0:
+            continue
+        ax[1].plot([cc*dt, cc*dt],ax[1].get_ylim(),color=colors[ids[ci]-1], linestyle='--', linewidth=1.5, alpha = 0.6, zorder=0)
     
     ### m plot
     ax[0].set_ylim([np.amin(m / params['m0'])*0.8,np.amax(m / params['m0'])*1.1])
     # ax[0].plot(t, m/params['m0'], color = mcolors['black'], linewidth = 3., label='m')
     ax[0].plot(t, m/params['m0'], color = params['color'], linewidth = 3., label='m')
-    ax[0].plot([t[0],t[-1]],[params['m_c'], params['m_c']], color = 'k', linestyle='-.', label='$m_{c}$')
+    # ax[0].plot([t[0],t[-1]],[params['m_c'], params['m_c']], color = 'k', linestyle='-.', label='$m_{c}$')
     
     # /params['m0']
     # ax[0].plot([params['tau_F']*4,params['tau_F']*4],ax[0].get_ylim(), color = mcolors['red'], linestyle = '-.', linewidth = 2)
@@ -142,7 +155,7 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     # ax[0].plot([params['t1max'][0], params['t1max'][0]],ax[0].get_ylim(), color = mcolors['red'], linestyle = '-.', linewidth = 2)
 
     ax[1].set_xlabel('time (hours)')
-    ax[1].set_ylabel('m/m0')
+    ax[0].set_ylabel('m/m$_{0}$')
     ax[0].legend(loc=1)
 
 
@@ -151,9 +164,9 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     print('regions:', end=" "); print(ids)
     params['time_to_AC'] = ((count[ids==1]) * params['dt'])[0]
     print(params['time_to_AC'])
-    
+    print(colors)
     for ni, nn in enumerate(ids):
-        rect = patches.Rectangle((cumsum[ni]*dt,ax[0].get_ylim()[0]), count[ni]*dt, np.diff(ax[0].get_ylim()), color=colors[nn-1], alpha=0.2)
+        rect = patches.Rectangle((cumsum[ni]*dt,ax[0].get_ylim()[0]), count[ni]*dt, np.diff(ax[0].get_ylim()), color=colors[nn-1], alpha=.8)
         #### ragged list warnings happen below ####
         ### plt error.. 
         ax[0].add_patch(rect)
@@ -181,7 +194,7 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     return params, fig, ax # fig2,
     
 
-def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, params):
+def plot_PD_rates(capture2minima, capmax, capture_mvals, x_cvals, m_space, a_space, params):
 
     a_c = np.array(params['a_c'])
     m_c = params['m_c']
@@ -189,16 +202,18 @@ def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, param
 
     gfig = go.Figure().update_layout(
             template="simple_white",
-            width=700, height=600,
-            xaxis = dict(range=[0., 3.], mirror=True, showline=True),
-            yaxis = dict(range=[np.amin(capture_mvals), 1.5], mirror=True, showline=True),
+            width=600, height=600,
+            xaxis = dict(range=[0., 4.], mirror=True, showline=True),
+            yaxis = dict(range=[np.amin(capture_mvals), 1.25], mirror=False, showline=True),
+            # yaxis = dict(range=[0., 1.5], mirror=True, showline=True),
             font=dict(
                 # family="Courier New, monospace",
                 size=18,
                 # color="RebeccaPurple"
                 ),
-                paper_bgcolor='rgba(0,0,0,0)',
-                  plot_bgcolor='rgba(0,0,0,0)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            showlegend=False
             )
 
     xlims = gfig.layout.xaxis.range; ylims = gfig.layout.yaxis.range
@@ -213,12 +228,12 @@ def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, param
 
     gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]), 
                               y=np.append(np.array(capture_mvals)/params['m0'], [m_c]),
-                        mode='none',  fill='tozerox', fillcolor='rgba(148, 0,211, 0.3)'
+                        mode='none',  fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
                         )
                   )
     gfig.add_trace(go.Scatter(x=capmax, 
                              y=capture_mvals / params['m0'],
-                        mode='none', fill='tonextx', fillcolor='rgba(3, 255,127, 0.3)'
+                        mode='none', fill='tonextx', fillcolor='rgba(15, 32, 128, 1)'
                              )
                   )
     ## top
@@ -239,23 +254,30 @@ def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, param
     # #                                      line=dict(color='green', width=4))
     #               )
 
-    gfig.add_trace(go.Scatter(
-                        x=np.concatenate((a_c[m_space/params['m0']>m_c], np.array([a_space[0]]))),
-                        y=np.concatenate((m_space[m_space/params['m0']>m_c], np.array([m_space[-1]]))) / params['m0'],
-                        mode='none', fill='tozerox', fillcolor='rgba(148, 0,211, 0.3)'
-                    )
-    #                                      line=dict(color='green', width=4))
-                  )
+    # gfig.add_trace(go.Scatter(
+    #                     x=np.concatenate((a_c[m_space/params['m0']>m_c], np.array([a_space[0]]))),
+    #                     y=np.concatenate((m_space[m_space/params['m0']>m_c], np.array([m_space[-1]]))) / params['m0'],
+    #                     mode='none', fill='tozerox', fillcolor='rgba(148, 0,211, 0.3)'
+    #                 )
+    # #                                      line=dict(color='green', width=4))
+    #               )
 
 
     #### lines
+    # gfig.add_trace(go.Scatter(
+    #                     x=a_c[a_c >= a_c[mc_ind]],
+    #                     y=m_space[a_c >= a_c[mc_ind]] / params['m0'],
+    #                     mode='lines', line=dict(color='green', width=4)
+    #                     )              
+    #               )
+
     gfig.add_trace(go.Scatter(
-                        x=a_c[a_c >= a_c[mc_ind]],
-                        y=m_space[a_c >= a_c[mc_ind]] / params['m0'],
-                        mode='lines', line=dict(color='green', width=4)
+                        x=x_cvals[x_cvals[:,0] < np.amin(capture2minima),0],
+                        y=x_cvals[x_cvals[:,0] < np.amin(capture2minima),1],
+                        mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6), fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
+
                         )              
                   )
-
     # gfig.add_trace(go.Scatter(
     #                     x=a_c[a_c <= a_c[mc_ind]],
     #                     y=m_space[a_c <= a_c[mc_ind]] / params['m0'],
@@ -265,18 +287,18 @@ def plot_PD_rates(capture2minima, capmax, capture_mvals, m_space, a_space, param
 
     gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]),
                               y=np.append(np.array(capture_mvals), [m_space[mc_ind]]) / params['m0'],
-                        mode='lines',line=dict(color='blue', width=4),
+                        mode='lines',line=dict(color='rgba(78, 247, 75, 1)', width=6),
                              )
                   )
 
-    gfig.add_trace(go.Scatter(x=[np.amin(a_space), np.amax(a_space)], y=[m_c, m_c], # a_c[mc_ind]
-                        mode='lines', line=dict(color='red', width=4, dash='dot'),
-                             )
-                  )
+    # gfig.add_trace(go.Scatter(x=[np.amin(a_space), np.amax(a_space)], y=[m_c, m_c], # a_c[mc_ind]
+    #                     mode='lines', line=dict(color='red', width=4, dash='dot'),
+    #                          )
+    #               )
 
     gfig.add_trace(go.Scatter(x=np.append(capmax, a_c[mc_ind]), 
                              y=np.append(np.array(capture_mvals), m_space[mc_ind]) / params['m0'],
-                        mode='lines', line=dict(color='red', width=4),
+                        mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6),
                              )
                   )
 

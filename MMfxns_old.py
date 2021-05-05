@@ -4,7 +4,6 @@ import math
 import numpy as np
 import scipy
 from scipy.signal import argrelextrema, find_peaks
-from scipy.interpolate import griddata
 import scipy.ndimage as nd
 
 import matplotlib.pyplot as plt
@@ -23,8 +22,6 @@ import matplotlib.patches as patches
 from matplotlib import colors as m2colors
 
 from numpy.random import Generator, PCG64
-
-from MMplotting import plot_PD_rates
 # import warnings
 # ## importing and doing this to ignore warning in plt add_patch
 # warnings.filterwarnings("ignore", category=DeprecationWarning) 
@@ -45,7 +42,7 @@ class noise:
 def f_m(m, params):
     if isinstance(params['type'], str):
         if params['type'] == 'stiff':
-            return 1 - np.exp(-m/params['m0'])  + 0.4
+            return 1 - np.exp(-m/params['m0'])
         if params['type'] == 'soft':
             return 1 - np.exp(-params['m0']/m)
         if params['type'] ==  'basic':
@@ -55,6 +52,8 @@ def f_m(m, params):
         if params['type'] == '-stiff':
             inv_og_tau = 1.
             return -(1 - np.exp(-m/params['m0'])) + inv_og_tau
+        if params['type'] == 'switch':
+            return (m/params['m0'])**params['g'] / ( (m/params['m0'])**params['g'] + 1 )  + 1 - np.exp(-m/params['m0'])
     else:
         if isinstance(m, np.ndarray):
             return params['type'] * np.ones(len(m))
@@ -71,18 +70,8 @@ def U(fm, m, x, a, params):
     mscale = m/params['m0']
     return (
         (-km * x_total(a, params) - (a + mscale**params['g'] / (mscale**params['g']+1))) * x + x**2/2 * (km + kc) + (a + mscale**params['g'] / (mscale**params['g']+1)) * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n']) 
+        # + m * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n'])
     )
-
-# def U(fm, m, x, a, params):
-#   without x_ref
-
-#     km = fm(m, {'type':params['km'], 'm0':params['m0'], 'g':params['g']})
-#     kc = fm(m, {'type':params['kc'], 'm0':params['m0'], 'g':params['g']})
-#     mscale = m/params['m0']
-#     return (
-#         (-km * x - (a + mscale**params['g'] / (mscale**params['g']+1))) * x + x**2/2 * (kc) + (a + mscale**params['g'] / (mscale**params['g']+1)) * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n']) 
-#         # + m * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n'])
-#     )
 
 def U_old(fm, m, x, a, params):
     km = fm(m, {'type':params['km'], 'm0':params['m0'], 'g':params['g']})
@@ -113,8 +102,7 @@ def x_equil(x, m, alpha, params):
     # dynamic nuclear exit rate
     km = f_m(m, {'type':params['km'], 'm0':params['m0'], 'g':params['g']})
     kc = f_m(m, {'type':params['kc'], 'm0':params['m0'], 'g':params['g']})
-    mscale = m/params['m0']
-    return km * x_total(alpha, params)  - x * (km + kc) + (alpha + mscale**params['g']/(mscale**params['g']+1)) * x**params['n']/(x**params['n']+1)
+    return km * x_total(alpha, params)  - x * (km + kc) + alpha * x**params['n']/(x**params['n']+1)
 
 def collect_minima(U, m_space, x_space, a_space, params):
     
@@ -188,6 +176,77 @@ def build_mprof(inarr, res):
 
     return np.array(m)
 
+# def m_solve_real_positives(x_lim, a_current, n_current, tau, stype):
+
+#     # print(a_current)
+#     # print(x_lim)
+#     x_space = np.linspace(0, np.amax([int(x_lim), 5.]), int(x_lim * 5000))
+
+#     solcands = 1 + x_space**n_current - np.sqrt(n_current * a_current * tau * x_space**(n_current-1))
+#     # restricted to real positives, get the two smallest roots.
+#     # root_inds = np.argpartition(np.abs(solcands),2)
+#     root_inds = np.insert((np.diff(np.sign(solcands)) != 0),0,0)
+#     # print(np.sum(root_inds))
+#     roots = np.array(sorted(x_space[root_inds]))
+#     # print(roots)
+#     if stype == 'stiff':
+#         m_roots = np.round(-np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
+#     elif stype == 'soft':
+#         m_roots = np.round(-1 / np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
+#         # if m_roots[1] < 0:
+#         #     print(x_lim)
+#         #     print(a_current)
+#         #     print(m_roots)
+#         #     print(roots)
+#         #     sys.exit()
+
+#     if len(roots) < 2:
+#         ## this is where several trials are hanging
+#         print('num roots < 2 breaking')
+#         print(roots)
+#         print(m_roots)
+#         print(x_lim)
+#         print(a_current)
+#         print(tau)
+
+#         return np.NaN, np.NaN
+
+#         # print(root_inds)
+#         # print(roots)
+#         # print(m_roots)
+#         # print(np.array(sorted(x_space[root_inds][0:3])))
+#         # plt.plot(x_space, solcands)
+#         # plt.plot(plt.xlim(),[0,0])
+#         # plt.show()
+#         # sys.exit()
+#     # print(m_roots)
+#     # if len(m_roots) != 2 or np.amax(m_roots) < 0 or roots[0] in [0,len(x_space)] or roots[1] in [0,len(x_space)] or m_roots[0] == m_roots[1]:
+#     #     print(m_roots)
+        
+#     #     print('symbolic solve, check')
+#     #     alpha, x, n, tauv = sympy.symbols('alpha x n tauv')
+#     #     eqn = sympy.Eq(1 + x**n, sympy.sqrt(alpha * n * tauv * x**(n-1)))
+
+#     #     eqn = eqn.subs(n, n_current)
+#     #     eqn = eqn.subs(alpha, a_current)
+#     #     eqn = eqn.subs(tauv, tau)
+
+#     #     sol = sympy.solve(eqn, x, force=True)
+
+#     #     roots = np.array([s for s in sol if s.is_real]).astype(np.float64)
+#     #     # print(type(roots[0]))
+#     #     roots = roots[roots > 0]
+#     #     # print(roots)
+#     #     # print(type(roots))
+#     #     if stype == 'stiff':
+#         #     m_roots = np.round(-np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
+#         # elif stype == 'soft':
+#         #     m_roots = np.round(-1 / np.log(1 - roots / tau + a_current * roots**n_current / (1+roots**n_current)), 4)
+
+#     #     print(m_roots)
+#     # returns m1/m0, m2/m0, where m1 is smaller than m2
+#     return m_roots[1], m_roots[0]
+
 def rle(inarray):
         """ run length encoding. Partial credit to R rle function. 
             Multi datatype arrays catered for including non Numpy
@@ -203,113 +262,97 @@ def rle(inarray):
             p = np.cumsum(np.append(0, z))[:-1] # positions
             return(z, p, ia[i])
 
+# def calc_PD(params):
+    
+#     if 'x_max' not in params.keys():
+#         params['x_max'] = params['x0']
+
+#     mtst = np.zeros((5000,2)) # + 0j
+#     a_space = np.linspace(0, params['a_max']+1, 5000)
+#     for ai, aa in enumerate(a_space):
+#         # pd in m/m0
+#         # mtst[ai,0] = m1n3(aa, n) # * params['m0']
+#         # mtst[ai,1] = m2n3(aa, n) # * params['m0']
+#         if aa >= params['a_c']:
+#             ## for 'soft' this part is problematic, since one of the roots flips to negative at singularity.
+#             mtst[ai,:] = m_solve_real_positives(params['x_max']*1.5, aa, params['n'], params['tau'], params['type'])
+#     # sum and divide complex conjugate roots under a0
+#     # mtst[a_space < params['a_c'],0] = np.sum(mtst[a_space < params['a_c'],:],axis=1)/2
+#     # mtst[a_space < params['a_c'],1] = np.sum(mtst[a_space < params['a_c'],:],axis=1)/2
+
+#     return a_space, mtst
+
 def calc_PD_rates(params):
 
     if 'x_max' not in params.keys():
         params['x_max'] = params['x0']
 
-    a_space = np.linspace(0.01, params['a_max']+1, params['res'])
+    a_space = np.linspace(0, params['a_max']+1, params['res'])
     params['a_space'] = a_space
-    x_space = np.linspace(0.01, np.amax([params['x_max']*1.5, 8.]), params['res'])
+    x_space = np.linspace(0.01, np.amax([params['x_max']*1.5, 5.]), params['res'])
     params['x_space'] = x_space
-    
-    U_data, U_mins, x_arr_max, gmin_overm, b1_overm, b2_overm, inf_overm, capture2minima, capture_mvals, capmax, barrier_heights = collect_minima(U, params['m_space'], x_space, a_space, params)
+    # m_space = 
 
-    cs = plt.contour(a_space, params['m_space'] / params['m0'], x_arr_max, levels=[params['x_c']])
-    # plt.show()
-    
-    x_cvals = np.vstack(cs.allsegs[0])
-    # print(x_cvals)
-    x_cvals = x_cvals[x_cvals[:,0] < np.amin(capture2minima),:]
+    U_data, gmin_overm, b1_overm, b2_overm, inf_overm, capture2minima, capture_mvals, capmax = collect_minima(params['m_space'], x_space, a_space, params)
 
-    gfig = plot_PD_rates(capture2minima, capmax, capture_mvals, x_cvals, params['m_space'], a_space, params)
+    # first col is m values, second col is low minima (blue), third col is high minima (red)
+    mtst = np.concatenate((np.array(capture_mvals)[:,None], np.array(capture2minima)[:,None], np.array(capmax)[:,None]), axis=1)   
 
-    # first col is m values, second col is low minima (blue), third col is high minima (red),
-    mtst = np.concatenate((np.array(capture_mvals)[:,None] / params['m0'], np.array(capture2minima)[:,None], np.array(capmax)[:,None]), axis=1)
-
-    lowlines = np.concatenate((x_cvals,mtst[:,[1,0]]), axis=0)
-    lowlines = lowlines[lowlines[:,0].argsort()]
-    # print(lowlines)
-
-    boostgrid = np.linspace(np.amin(lowlines[:,0]),np.amax(lowlines[:,0]),int(1000))
-    boostrez = griddata(lowlines[:,0].squeeze(),lowlines[:,1].squeeze(),boostgrid,method='linear')
-    newlowlines = np.concatenate((boostgrid[:,None], boostrez[:,None]), axis=1)
-    # print(newlowlines)
-
-    highlines = np.concatenate((x_cvals,mtst[:,[2,0]]), axis=0)
-    highlines = highlines[highlines[:,0].argsort()]
-
-    boostgrid = np.linspace(np.amin(highlines[:,0]),np.amax(highlines[:,0]),int(1000))
-    boostrez = griddata(highlines[:,0].squeeze(),highlines[:,1].squeeze(),boostgrid,method='linear')
-    newhighlines = np.concatenate((boostgrid[:,None], boostrez[:,None]), axis=1)
-
-    # gfig.show()
-
-    # x_cvals is the dividing line between region 1 and region 2
-    return mtst, x_cvals, newlowlines, newhighlines
+    return mtst
 
 def update_alpha(t_region, alpha, params):
 
-    # mscale = m/params['m0']
-
     if params['dynamics'] == 'constant':
         # print(params['dynamics'])
-        if t_region[0] in [2]:
+        if t_region[0] in [1,2]:
             dalpha = 1/params['tau_SG'] * params['dt']
 
-        elif t_region[0] in [1]:
+        elif t_region[0] in [3,4]:
             dalpha = -1/params['tau_F'] * params['dt']
 
-        elif t_region[0] in [3]:
+        elif t_region[0] in [5,6]:
             dalpha = -1/params['tau_SR'] * params['dt']
 
     elif params['dynamics'] == 'exp_staticTS':
         # print(params['dynamics'])
-        if t_region[0] in [2]:
+        if t_region[0] in [1,2]:
             dalpha = alpha/params['tau_SG'] * params['dt']
 
-        elif t_region[0] in [1]:
+        elif t_region[0] in [3,4]:
             dalpha = -alpha/params['tau_F'] * params['dt']
 
-        elif t_region[0] in [3]:
+        elif t_region[0] in [5,6]:
             dalpha = -alpha/params['tau_SR'] * params['dt']
 
     elif params['dynamics'] == 'exp_dynamicTS':
         # print(params['dynamics'])
-        if t_region[0] in [2]:
+        if t_region[0] in [1,2]:
             dalpha = alpha/params['tau_SG'] * params['dt']
 
-        elif t_region[0] in [1]:
+        elif t_region[0] in [3,4]:
             dalpha = -alpha/params['tau_F'] * params['dt']
 
-        elif t_region[0] in [3]:
+        elif t_region[0] in [5,6]:
             dalpha = -alpha/params['tau_SR'] * params['dt']
             
     elif params['dynamics'] == 'updated_exp':
-        if t_region[0] in [2]:
+        if t_region[0] in [1,2]:
             dalpha = alpha/params['tau_SG'] * params['dt']
 
-        elif t_region[0] in [1]:
-            dalpha = -(alpha - params['a0'])/params['tau_F'] * params['dt']
+        elif t_region[0] in [3,4]:
+            dalpha = -alpha/params['tau_F'] * params['dt']
 
-        elif t_region[0] in [3]:
+        elif t_region[0] in [5,6]:
             dalpha = -alpha/params['tau_SR'] * params['dt']        
     else:
         dalpha = 0.    
 
     return dalpha + params['eps'].draw()
 
-def update_tau(params, x_prof, m_prof):
-
-    params['tau_SR'] = params['tau_R0'] * params['m0']/m_prof * np.exp(x_prof/params['TV0SR'])
-    params['tau_SG'] = params['tau_R0'] * params['m0']/m_prof * np.exp(x_prof/params['TV0SG'])
-
-    return params
 
 def integrate_profile(m_profile, t_space, params, resultsDF):
 
     if 'eps' not in params.keys():
-        print('adding noise')
         params['eps'] = (0., 1., 0.)
     params['eps'] = noise(params['eps'][0], params['eps'][1], params['eps'][2])
 
@@ -323,21 +366,16 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
     active_region = []; t_primelist = []; t1maxlist = []; deltaVlist = []; tsg_list = []
     t_region = [0,0] # (region, t)
     
-    mtst2, x_cvals, newlowlines, newhighlines = calc_PD_rates(params)  
+    # a_space, mtst = calc_PD(params)
+    mtst2 = calc_PD_rates(params)
 
-    # plt.plot(newlowlines[:,0], newlowlines[:,1])
-    # plt.plot(newhighlines[:,0], newhighlines[:,1])
-    # plt.show()
-
-        # if np.isnan(mtst2).any() or np.amin(params['a_space']) > 0:
-    #     params['earlyexit'] = 1
-    #     return resultsDF, params
+    if np.isnan(mtst2).any() or np.amin(params['a_space']) > 0:
+        params['earlyexit'] = 1
+        return resultsDF, params
 
     a_term = np.amax(mtst2[:,1])
 
     for ti, tt in enumerate(t_space):
-
-        # print(alpha_prof[ti-1])
 
         current_m_ind = np.where(np.abs(params['m_space'] - m_profile[ti]) == np.amin(np.abs(params['m_space'] - m_profile[ti])))[0][0]
 
@@ -349,24 +387,37 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
         params['x_max'] = np.amax(x_prof)
         xUd = np.linspace(0, params['x_max']*2.5, int(1e5))
 
-        axc_low = newlowlines[np.abs(newlowlines[:,0] - alpha_prof[ti-1]) == np.amin(np.abs(newlowlines[:,0] - alpha_prof[ti-1]))].squeeze()
-        axc_high = newhighlines[np.abs(newhighlines[:,0] - alpha_prof[ti-1]) == np.amin(np.abs(newhighlines[:,0] - alpha_prof[ti-1]))].squeeze()
+        if alpha_prof[ti-1] >= params['a_c'][current_m_ind]:
+            # m1, m2 = m_solve_real_positives(params['x_max']*1.5, alpha_prof[ti-1], params['n'], params['tau'], params['type'])
+
+            m1ind = np.where(np.abs(mtst2[:,0] - params['m_space'][current_m_ind]) == np.amin(np.abs(mtst2[:,0] - params['m_space'][current_m_ind])))[0][0]
+
+            m1 = mtst2[m1ind, 0] / params['m0']
+            a1 = mtst2[m1ind, 1]
+            a2 = mtst2[m1ind, 2]
+
+            # if np.isnan(m1) or np.isnan(m2):
+            #     print(params)
+            #     print(np.amax(m_profile))
+            #     print(np.amin(m_profile))
+            #     params['earlyexit'] = 1
+            #     return resultsDF, params
+        # else:
+            # m1 = 0; m2 = 0
     
         if alpha_prof[ti-1] >= params['a_max']:
-            print('max')
             # permanent memory;
             alpha_prof[ti] = params['a_max']
             x_prof[ti] = scipy.optimize.fsolve(x_equil, x_prof[ti-1], args=(m_profile[ti], alpha_prof[ti], params), xtol=1e-10)[0]
-            if m_profile[ti] / params['m0'] > axc_high[1]:
+            if m_profile[ti] > params['m_c']:
                 active_region.append(2)
             else:
-                active_region.append(3)
+                active_region.append(6)
 
         else:
-           
-            if m_profile[ti] / params['m0'] < axc_low[1]:
+
+            if alpha_prof[ti-1] < params['a_c'][current_m_ind] and m_profile[ti] / params['m0'] > params['m_c']:
             # region 1
-                # print('r1')
                 active_region.append(1)
 
                 if t_region[0] != 1:
@@ -374,103 +425,180 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                     t_region[1] = dt
                 else:
                     t_region[1] += dt
-                
-                # if alpha_prof[ti-1] > params['a0']:
+                    
                 dalph = update_alpha(t_region, alpha_prof[ti-1], params)
-                # else:
-                    # dalph = 0.
                 alpha_prof[ti] = alpha_prof[ti-1] + dalph
                 # alpha_prof[ti] = a_mstar*np.exp((t_region[1]-4*params['tau_F'])/params['tau_SG'])
-
-            elif m_profile[ti] / params['m0'] > axc_high[1]: # and alpha_prof[ti-1] > axc_low[0] and m_profile[ti] / params['m0'] > axc_low[1]:
-                
-            # print('r2')
-            # region 2
+            
+            elif alpha_prof[ti-1] >= params['a_c'][current_m_ind] and m_profile[ti] / params['m0'] > params['m_c']:
+                # region 2
                 active_region.append(2)
-                
+
                 if t_region[0] != 2:
-                    if t_region[0] not in [3]:
-                        t_region[0] = 2
+                    t_region[0] = 2
+                    t_region[1] = dt
+                    a_enter = alpha_prof[ti-1]
+                else:
+                    t_region[1] += dt
+                    
+                if alpha_prof[ti-1] < params['a_max']:
+                    # alpha_prof[ti] = a_enter * np.exp(t_region[1]/params['tau_SG'])
+                    # dalph = alpha_prof[ti-1]/params['tau_SG'] * dt
+                    dalph = update_alpha(t_region, alpha_prof[ti-1], params)
+                    alpha_prof[ti] = alpha_prof[ti-1] + dalph
+                else:
+                    alpha_prof[ti] = params['a_max']
+
+            elif alpha_prof[ti-1] < params['a_c'][current_m_ind] and m_profile[ti] / params['m0'] < params['m_c']:
+                # region 3
+                active_region.append(3)
+                
+                if t_region[0] != 3:
+                    if t_region[0] not in [4,5,6]:
+                        t_region[0] = 3
                         t_region[1] = dt
                         a_enter = alpha_prof[ti-1]
                     else:
-                        t_region[0] = 2
+                        t_region[0] = 3
                         t_region[1] += dt
                         a_enter = alpha_prof[ti-1]
                 else:
                     t_region[1] += dt
                     
+                # alpha_prof[ti] = params['a0'] + (a_enter-params['a0']) * np.exp(-t_region[1]/params['tau_F'])
+                if alpha_prof[ti-1] > params['a0']:
+                    # dalph = -alpha_prof[ti-1]/params['tau_F'] * dt
+                    dalph = update_alpha(t_region, alpha_prof[ti-1], params)
+                else:
+                    dalph = 0.
+
+                alpha_prof[ti] = alpha_prof[ti-1] + dalph
+
+            elif alpha_prof[ti-1] > params['a_c'][current_m_ind] and alpha_prof[ti-1] < a1 and m_profile[ti] / params['m0'] < params['m_c']:  # and alpha_prof[ti-1] <= a_term:
+                # region 4
+   
+                active_region.append(4)
+                
+                if t_region[0] != 4:
+                    t_region[0] = 4
+                    a_enter = alpha_prof[ti-1]
+                    # print('here')
+                    # print(a_enter)
+                    if t_region[0] in [5,6]:
+                        t_region[1] += dt
+                    else:
+                        t_region[1] = dt
+                else:
+                    t_region[0] = 4
+                    t_region[1] += dt
+                               
+                # alpha_prof[ti] = params['a_c'] + (a_enter - params['a_c']) * np.exp(-t_region[1]/params['tau_F'])
+
+                # alpha_prof[ti] = a_enter * np.exp(-t_region[1]/params['tau_F'])
+                # dalph = -alpha_prof[ti-1]/params['tau_F'] * dt
+                # alpha_prof[ti] = alpha_prof[ti-1] + dalph
+                if alpha_prof[ti-1] > params['a0']:
+                    # dalph = -alpha_prof[ti-1]/params['tau_F'] * dt
+                    dalph = update_alpha(t_region, alpha_prof[ti-1], params)
+                else:
+                    dalph = 0.
+                # print(dalph)
+                alpha_prof[ti] = alpha_prof[ti-1] + dalph
+
+            # elif ((alpha_prof[ti-1] > params['a_c'] and m_profile[ti] / params['m0'] >= m1) or alpha_prof[ti-1] > a_term) and m_profile[ti] / params['m0'] <= m2:
+            elif alpha_prof[ti-1] > a1 and alpha_prof[ti-1] < a2 and m_profile[ti] / params['m0'] < params['m_c']:
+                # region 5
+                active_region.append(5)
+
+                if t_region[0] not in [4,5,6]:
+                    # print('enter 5')
+                    params['tau_SR'] = params['tau_SG']
+                    # print('tau_SR start %e' % (params['tau_SR']))
+                    t_region[0] = 5
+                    t_region[1] = dt
+                    a_enter = alpha_prof[ti-1]
+                else:
+                    t_region[0] = 5
+                    t_region[1] += dt
+                    # print(a_enter)
+                # alpha_prof[ti] = params['a0'] + (a_enter - params['a0']) * np.exp(-t_region[1]/params['tau_SR'])
+                # alpha_prof[ti] = a_enter * np.exp(-t_region[1]/params['tau_SG'])
+                # dalph = -alpha_prof[ti-1]/params['tau_SR'] * dt
+                dalph = update_alpha(t_region, alpha_prof[ti-1], params)
+                alpha_prof[ti] = alpha_prof[ti-1] + dalph
+
+            # elif alpha_prof[ti-1] > params['a_c'] and m_profile[ti] / params['m0'] < params['m_c'] and m_profile[ti] / params['m0'] > m2:
+            elif alpha_prof[ti-1] > a2 and m_profile[ti] / params['m0'] < params['m_c']:
+                # region 6
+                active_region.append(6)
+                
+                if t_region[0] not in [4,5,6]:
+                    # print('enter 6')
+                    # print('tau_SG start %e' % (params['tau_SG']))
+                    params['tau_SR'] = params['tau_SG']
+                    # print('tau_SR start %e' % (params['tau_SR']))
+                    t_region[0] = 6
+                    t_region[1] = dt
+                    a_enter = alpha_prof[ti-1]
+                else:
+                    t_region[0] = 6
+                    t_region[1] += dt
+                    
+                # alpha_prof[ti] = params['a0'] + (a_enter - params['a0']) * np.exp(-t_region[1]/params['tau_SR'])
+                # alpha_prof[ti] = a_enter * np.exp(-t_region[1]/params['tau_SG'])
+                # dalph = -alpha_prof[ti-1]/params['tau_SR'] * dt
                 dalph = update_alpha(t_region, alpha_prof[ti-1], params)
                 alpha_prof[ti] = alpha_prof[ti-1] + dalph
 
             else:
-             # region 3
-                # print('r3')
-                active_region.append(3)
-                
-                if t_region[0] != 3:
-                    if t_region[0] not in [3]:
-                        # print('enter 6')
-                        # print('tau_SG start %e' % (params['tau_SG']))
-                        params['tau_SR'] = params['tau_SG']
-                        # print('tau_SR start %e' % (params['tau_SR']))
-                        t_region[0] = 3
-                        t_region[1] = dt
-                        a_enter = alpha_prof[ti-1]
-                    else:
-                        t_region[0] = 3
-                        t_region[1] += dt
-                
-                dalph = update_alpha(t_region, alpha_prof[ti-1], params)
-                alpha_prof[ti] = alpha_prof[ti-1] + dalph
+                print('what')
+                sys.exit()
 
-            x_prof[ti] = scipy.optimize.fsolve(x_equil, x_prof[ti-1], args=(m_profile[ti], alpha_prof[ti], params), xtol=1e-10)[0]          
+            x_prof[ti] = scipy.optimize.fsolve(x_equil, x_prof[ti-1], args=(m_profile[ti], alpha_prof[ti], params), xtol=1e-10)[0]
 
-        if t_region[0] in [2,3]: # and params['dynamics'] == 'exp_dynamicTS':
+        if t_region[0] in [2,5,6] and params['dynamics'] == 'exp_dynamicTS':
+            # finding the barrier height.
+            # energy slice over x at alpha, m
+            U_data = U(f_m, m_profile[ti], xUd, alpha_prof[ti], params)
 
-            params = update_tau(params, x_prof[ti], m_profile[ti])
-            # # finding the barrier height.
-            # # energy slice over x at alpha, m
-            # U_data = U(f_m, m_profile[ti], xUd, alpha_prof[ti], params)
+            x_args = find_peaks(-np.abs(np.diff(U_data)))[0]
+            stop = 0
+            while len(x_args) < 2 and stop < 20 :
+                xUd = np.linspace(0., np.amax(xUd)+0.5, int(3e5))
+                U_data = U(f_m, m_profile[ti], xUd, alpha_prof[ti], params)
+                x_args = find_peaks(-np.abs(np.diff(U_data)))[0]
+                stop += 1
 
-            # x_args = find_peaks(-np.abs(np.diff(U_data)))[0]
-            # stop = 0
-            # while len(x_args) < 2 and stop < 20 :
-            #     xUd = np.linspace(0., np.amax(xUd)+0.5, int(3e5))
-            #     U_data = U(f_m, m_profile[ti], xUd, alpha_prof[ti], params)
-            #     x_args = find_peaks(-np.abs(np.diff(U_data)))[0]
-            #     stop += 1
+            if stop == 100:
+                print('Udata')
+                print(U_data)
+                np.save('failureU.npy', U_data)
+                print(x_args)
+                print(x_prof[ti])
+                print(np.amin(xUd))
+                print(np.amax(xUd))
+                # print(x_argmin)
+                print(alpha_prof[ti])
+                print(params)
+                print(m_profile[ti])
+                params['earlyexit'] = 1
+                return resultsDF, params
 
-            # if stop == 100:
-            #     print('Udata')
-            #     print(U_data)
-            #     np.save('failureU.npy', U_data)
-            #     print(x_args)
-            #     print(x_prof[ti])
-            #     print(np.amin(xUd))
-            #     print(np.amax(xUd))
-            #     # print(x_argmin)
-            #     print(alpha_prof[ti])
-            #     print(params)
-            #     print(m_profile[ti])
-            #     params['earlyexit'] = 1
-            #     return resultsDF, params
-
-            # deltaV = np.amax(U_data[x_args]) - np.amin(U_data[x_args])
-            # # print(deltaV)
-            # deltaVlist.append(deltaV)
+            deltaV = np.amax(U_data[x_args]) - np.amin(U_data[x_args])
+            # print(deltaV)
+            deltaVlist.append(deltaV)
             tsg_list.append(params['tau_SG'])
 
-            # if deltaV > 0:
-            #     # print(type(params['tau_SG']))
-            #     params['tau_SR'] = (params['tau_R0'] * np.exp(deltaV/params['TV0SR']))
-            #      # params['tau_SG'] = params['tau_R0'] * np.exp(-params['TV0']/deltaV)
-            #     params['tau_SG'] = (params['tau_R0'] * np.exp(deltaV/params['TV0SG']))
-            #     # we want t_sg to get larger w/ increasing depth so that it stops increasing               
-            # else:
-            #     print(deltaV)
-            deltaVlist.append(np.NaN)
-            #     tsg_list.append(params['tau_SG'])
+            if deltaV > 0:
+                # print(type(params['tau_SG']))
+                params['tau_SR'] = (params['tau_R0'] * np.exp(deltaV/params['TV0SR']))
+                 # params['tau_SG'] = params['tau_R0'] * np.exp(-params['TV0']/deltaV)
+                params['tau_SG'] = (params['tau_R0'] * np.exp(deltaV/params['TV0SG']))
+                # we want t_sg to get larger w/ increasing depth so that it stops increasing               
+            else:
+                print(deltaV)
+                # deltaVlist.append(np.NaN)
+                # tsg_list.append(params['tau_SG'])
 
         elif (t_region[0] in [1,3,4] and params['dynamics'] == 'exp_dynamicTS') or (params['dynamics'] != 'exp_dynamicTS'):
             deltaVlist.append(np.NaN)
@@ -500,22 +628,21 @@ def summary_stats(resultsDF, params, verbose=True):
     m = resultsDF['m_profile'].values
     alpha = resultsDF['alpha_prof'].values
     x = resultsDF['x_prof'].values
-    active_region = resultsDF['active_region'].values
 
     def slice_tuple(slice_):
         return [slice_.start, slice_.stop, slice_.step]
 
-    if 'type' not in params.keys():
-        print('assuming stiff')
-        print('summary')
-        params['type'] = 'stiff'
+    # if 'type' not in params.keys():
+    #     print('assuming stiff')
+    #     print('summary')
+    #     params['type'] = 'stiff'
 
     # take the time series arrays and calculate observables.
     dt = t[1] - t[0]
 
-    if params['type'] == 'stiff':
+    if params['km'] == 'stiff':
         priming_mask = m / params['m0'] > params['m_c']
-    elif params['type'] == 'soft':
+    elif params['km'] == 'soft':
         priming_mask = m / params['m0'] < params['m_c']
     else:
         print('no type')
@@ -540,11 +667,8 @@ def summary_stats(resultsDF, params, verbose=True):
             return priming_times, memory_times, stiffP, stiffA
 
     priming_start_stop = np.array([slice_tuple(r[0]) for r in regions])
-    # print('&&&')
-    # print(params['dt'])
     # print(priming_start_stop)
     # print(priming_start_stop[:,1])
-
     # memory time
     # mem_start_candidates = [np.amax(t[r]) + dt for r in regions]
     # print(mem_start_candidates)
@@ -575,42 +699,17 @@ def summary_stats(resultsDF, params, verbose=True):
         memory_times[mi] = np.sum(np.abs(x[mm:end_ind] - x_compare) > 0.05*x_compare) * dt
         
         # print(np.sum(np.abs(x[mm:end_ind] - x_compare) > 0.05*x_compare))    
-    
-    counts, cumsum, ids = rle(active_region) 
-    memory2 = np.sum(counts[np.isin(ids, [3])]) * params['dt']
-    priming2 = np.sum(counts[np.isin(ids, [2])]) * params['dt']
-
-    if ids[-1] == 2:
-        avgm = np.mean(np.unique(m))
-        priming2 = np.sum(m > avgm) * params['dt']
-        memory2 = -1.  # np.sum(m < avgm) * params['dt']
         
-    # if np.abs(memory2 - memory_times[0]) > 24:
-    #     print('oh no')
-    #     print(priming_times)
-    #     print(priming2)
-    #     print(memory_times)
-    #     print(memory2)
-    #     print(counts)
-    #     print(ids)
-    #     print(priming_start_stop)
-        # sys.exit()
-
     mech_stats = np.abs(stiffP - stiffA) / params['m0']
 
     if verbose:
-        print('counts', end=" "); print(counts); print(np.sum(counts))
-        print('ids', end=" "); print(ids)
         print('priming times', end=" "); print(priming_times)
-        print('priming check', end = " "); print(priming2)
         print('memory times', end=" "); print(memory_times)
-        print('memory check', end = " "); print(memory2)
         print('mechanical ratios', end=" "); print(mech_stats)
 
     # print('memory times', end=" "); print(memory_times)
 
-    # return np.array(priming_times), memory_times, stiffP, stiffA # mech_stats
-    return np.array([priming2]), np.array([memory2]), stiffP, stiffA
+    return np.array(priming_times), memory_times, stiffP, stiffA # mech_stats
 
 
 def run_profile(e_func, inputs, params, resultsDF):
@@ -656,7 +755,7 @@ def run_profile(e_func, inputs, params, resultsDF):
 
     m_profile = build_mprof(inputs, params['resolution'])
 
-    m_space = np.linspace(np.amin([0.1, np.amin(m_profile)]), np.amax(m_profile)*1., params['res'])
+    m_space = np.linspace(np.amin([0.1, np.amin(m_profile)]), np.amax(m_profile)*1.5, params['res'])
     choose_mc_ind = np.where(np.abs(m_space - m_c*params['m0']) == np.amin(np.abs(m_space-m_c*params['m0'])))[0][0]
     a_c = alpha_crit(m_space, params)
     params['a_c'] = a_c;
@@ -667,7 +766,7 @@ def run_profile(e_func, inputs, params, resultsDF):
     print('--------')
     print('a_c = %f, x_c = %f, m_c in absolute = %f' % (a_c[choose_mc_ind], x_c, m_c * params['m0']))
 
-    # mtst2, x_cvals = calc_PD_rates(params)
+    mtst2 = calc_PD_rates(params)
 
     t_space = np.linspace(0, np.sum(inputs[:,0]), len(m_profile))
     params['dt'] = t_space[1]-t_space[0]

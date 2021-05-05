@@ -85,31 +85,30 @@ def set_params_rates(file=None):
             params = json.load(f)
     else:
 #         params['tau'] = .98
-        params['tau_F'] = 24. # params['tau'] * 2
-        params['tau_SG'] = 260. #params['tau'] * 150
+        params['tau_F'] = 12. # params['tau'] * 2
+        params['tau_SG'] = 200. #params['tau'] * 150
         params['tau_SR'] = params['tau_SG']
         
-        params['kc'] = 1. # '-stiff' # 0.98 # 'linear' # 0.5 #'soft' 1.
+        params['kc'] = 1.5 # '-stiff' # 0.98 # 'linear' # 0.5 #'soft' 1.
         params['km'] = 'stiff'      
-        params['x0'] = 2.; 
+        params['x0'] = 1.9; 
         params['a0'] = 1.; params['xtt'] = 0.
-        
-        params['m0'] = 6.
-        params['a_max'] = 50
-        params['n'] = 4.5
+        params['g'] = 35.
+        params['n'] = 7.        
+        params['m0'] = 6.5
+        params['a_max'] = 15
+
         params['resolution'] = 1.
-#         params['type'] = 'stiff'
         params['color'] = None
         params['input_m'] = []
         
-        params['tau_R0'] = 200 # params['tau_SG'] #* 2
-        params['TV0SR'] = 0.05
-        params['TV0SG'] = 1.8
+        params['tau_R0'] = 130 # params['tau_SG'] #* 2
+        params['TV0SR'] = params['x0']
+        params['TV0SG'] = params['x0']
         
-        params['dynamics'] = 'exp_dynamicTS'
-        params['eps'] = (0., 1., 0.008) # mean, std, magnitude
-        
-        params['res'] = 100
+        params['dynamics'] = 'updated_exp'
+        params['eps'] = (0., 1., 0.05) # mean, std, magnitude        
+        params['res'] = 150
     
     return params
 
@@ -129,7 +128,7 @@ def run_sim(ins, params, trials):
     return memout
 
 
-ptime = 168
+ptime = 240 # 240 # 120
 
 ins = np.array(
     [
@@ -143,7 +142,7 @@ params = set_params_rates()
 # params['input_m'].append(ins.tolist())
 start = timeit.default_timer()
 
-numtrials = np.arange(512)
+numtrials = np.arange(128)
 
 memappend = [];
 
@@ -184,8 +183,10 @@ print(len(results))
 # with open('../figures_v2/figure6_exp_fits/'+str(ptime)+'.N'+str(np.amax(numtrials))+'.json', 'w') as f:
 #     f.write(json.dumps(params))
 
-np.save('./noise_results_rates/'+str(ptime)+'.N'+str(np.amax(numtrials))+'.npy', results)
-with open('./noise_results_rates/'+str(ptime)+'.N'+str(np.amax(numtrials))+'.json', 'w') as f:
+label = np.random.randint(0,1000)
+
+np.save('./noise_results_mswitch/'+str(label) + '.P'+str(ptime)+'.N'+str(np.amax(numtrials))+'.npy', results)
+with open('./noise_results_mswitch/'+str(label) + '.P'+str(ptime)+'.N'+str(np.amax(numtrials))+'.json', 'w') as f:
     f.write(json.dumps(params))
 
 end = timeit.default_timer()

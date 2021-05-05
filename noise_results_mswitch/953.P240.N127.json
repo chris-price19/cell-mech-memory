@@ -1,0 +1,1 @@
+{"tau_F": 12.0, "tau_SG": 200.0, "tau_SR": 200.0, "kc": 1.5, "km": "stiff", "x0": 1.9, "a0": 1.0, "xtt": 0.0, "g": 35.0, "n": 7.0, "m0": 6.5, "a_max": 15, "resolution": 1.0, "color": null, "input_m": [], "tau_R0": 130, "TV0SR": 1.9, "TV0SG": 1.9, "dynamics": "updated_exp", "eps": [0.0, 1.0, 0.05], "res": 150}

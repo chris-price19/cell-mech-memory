@@ -44,8 +44,8 @@ def plot_sample_dynamics(ax, t, a1, a2, params):
 
     dt = t[1] - t[0]        
     
-    ax.plot(t, a1, linewidth=3., color=mcolors['blue'], label='priming')
-    ax.plot(t + np.amax(t), a2, linewidth=3.,color=mcolors['blue'],label='memory')
+    ax.plot(t, a1, linewidth=3., color=mcolors['lime'], label='priming')
+    ax.plot(t + np.amax(t), a2, linewidth=3.,color=mcolors['lime'],label='memory')
 
     xlims = ax.get_xlim()
     ylims = ax.get_ylim()
@@ -61,23 +61,31 @@ def plot_sample_dynamics(ax, t, a1, a2, params):
 
     rect0 = patches.Rectangle((xlims[0], ylims[0]), 
                          t[-1]-w1 + t[0]-xlims[0], ylims[1]-ylims[0], 
-                         color=mcolors['darkorange'], alpha=0.2)
+                         color = '#1e88e5ff', #color=mcolors['darkorange'], 
+                         # alpha=0.2
+                         )
 
     rect1 = patches.Rectangle((t[-1] - w1, ylims[0]), 
                              w1, ylims[1]-ylims[0], 
-                             color=mcolors['red'], alpha=0.2)
+                             color = '#1e88e5ff', #color=mcolors['red'], 
+                             # alpha=0.2
+                             )
     
     rect2 = patches.Rectangle((t[-1], ylims[0]), 
                              w2,ylims[1]-ylims[0], 
-                             color=mcolors['springgreen'], alpha=0.2)
+                             color= '#0f2080ff' # mcolors['springgreen'], 
+                             # alpha=0.2
+                             )
     
     rect3 = patches.Rectangle((w2 + t[-1], ylims[0]), 
                              t[-1] - w2 + xlims[1] - t[-1]*2, ylims[1]-ylims[0], 
-                             color=mcolors['darkviolet'], alpha=0.2)
+                             color = '#f5793aff', #color=mcolors['darkviolet'], 
+                         # alpha=0.2
+                         )
     
     ax.add_patch(rect0); ax.add_patch(rect1); ax.add_patch(rect2); ax.add_patch(rect3)
 
-    ax.plot(xlims,[params['a_c'], params['a_c']], color = mcolors['blue'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$')
+    # ax.plot(xlims,[params['a_c'], params['a_c']], color = mcolors['blue'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$')
 
     ax.set_xlim(xlims); ax.set_ylim(ylims)
 
