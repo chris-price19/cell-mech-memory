@@ -31,7 +31,20 @@ cwd = os.getcwd()
 sns.set(style="ticks", font_scale=1.5)
 mcolors = dict(m2colors.BASE_COLORS, **m2colors.CSS4_COLORS)
 
-
+def rle(inarray):
+        """ run length encoding. Partial credit to R rle function. 
+            Multi datatype arrays catered for including non Numpy
+            returns: tuple (runlengths, startpositions, values) """
+        ia = np.asarray(inarray)                # force numpy
+        n = len(ia)
+        if n == 0: 
+            return (None, None, None)
+        else:
+            y = np.array(ia[1:] != ia[:-1])     # pairwise unequal (string safe)
+            i = np.append(np.where(y), n - 1)   # must include last element posi
+            z = np.diff(np.append(-1, i))       # run lengths
+            p = np.cumsum(np.append(0, z))[:-1] # positions
+            return(z, p, ia[i])
 
 def add_m_traj(ax, a, m, t, params):
         
@@ -57,7 +70,7 @@ def add_m_traj(ax, a, m, t, params):
         
         return ax, ared, mred, tred
 
-def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'], 
+def plot_profile(fig, ax, resultsDF, params, x_solve, colors=[mcolors['darkorange'], 
               mcolors['red'],
               mcolors['navy'],
               mcolors['darkviolet'],
@@ -85,9 +98,9 @@ def plot_profile(fig, ax, resultsDF, params, colors=[mcolors['darkorange'],
     x_baseline = np.zeros(len(x))
     for mi, mm in enumerate(m):
         if mi > 0:
-            x_baseline[mi] = scipy.optimize.fsolve(x_equil, x_baseline[mi-1], args=(mm, params['a0'], params), xtol=1e-10)[0]
+            x_baseline[mi] = scipy.optimize.fsolve(x_solve, x_baseline[mi-1], args=(mm, params['a0'], params), xtol=1e-10)[0]
         else:
-            x_baseline[mi] = scipy.optimize.fsolve(x_equil, 1., args=(mm, params['a0'], params), xtol=1e-10)[0]
+            x_baseline[mi] = scipy.optimize.fsolve(x_solve, 1., args=(mm, params['a0'], params), xtol=1e-10)[0]
 
     dt = t[1] - t[0]
         
@@ -304,6 +317,73 @@ def plot_PD_rates(capture2minima, capmax, capture_mvals, x_cvals, m_space, a_spa
 
     return gfig
 
+
+def plot_PD_rates_v2(lowlines, highlines, m_space, a_space, params):
+
+    a_c = np.array(params['a_c'])
+    m_c = params['m_c']
+    # mc_ind = np.where(np.abs(m_space/ params['m0'] - m_c) == np.amin(np.abs(m_space/ params['m0']-m_c)))[0][0]
+
+    gfig = go.Figure().update_layout(
+            template="simple_white",
+            width=600, height=600,
+            xaxis = dict(range=[0., 4.], mirror=True, showline=True),
+            yaxis = dict(range=[np.amin(lowlines[:,1]), 1.25], mirror=False, showline=True),
+            # yaxis = dict(range=[0., 1.5], mirror=True, showline=True),
+            font=dict(
+                # family="Courier New, monospace",
+                size=18,
+                # color="RebeccaPurple"
+                ),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            showlegend=False
+            )
+
+    xlims = gfig.layout.xaxis.range; ylims = gfig.layout.yaxis.range
+    # capture_mvals = np.array(capture_mvals)
+
+
+    #### fills
+
+    ## bottom
+    # xx = np.concatenate((capture2minima, capmax, )) # np.array([xlims[1], np.amin(capture2minima)])
+    # yy = np.concatenate((capture_mvals, capture_mvals,)) / params['m0'] #  np.array([ylims[0], ylims[0]])
+
+    gfig.add_trace(go.Scatter(x=lowlines[:,0], 
+                              y=lowlines[:,1],
+                        mode='none',  fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
+                        )
+                  )
+    gfig.add_trace(go.Scatter(x=highlines[:,0], 
+                             y=highlines[:,1],
+                        mode='none', fill='tonextx', fillcolor='rgba(15, 32, 128, 1)'
+                             )
+                  )
+
+
+    # gfig.add_trace(go.Scatter(
+    #                     x=x_cvals[x_cvals[:,0] < np.amin(capture2minima),0],
+    #                     y=x_cvals[x_cvals[:,0] < np.amin(capture2minima),1],
+    #                     mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6), fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
+
+    #                     )              
+    #               )
+
+    gfig.add_trace(go.Scatter(x=lowlines[:,0],
+                              y=lowlines[:,1],
+                        mode='lines',line=dict(color='rgba(78, 247, 75, 1)', width=6),
+                             )
+                  )
+
+
+    gfig.add_trace(go.Scatter(x=highlines[:,0], 
+                             y=highlines[:,1],
+                        mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6),
+                             )
+                  )
+
+    return gfig
 
 
 def plot_memcorr(memDF, subcols, prettylabel, ax):

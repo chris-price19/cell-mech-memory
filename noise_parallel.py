@@ -40,7 +40,7 @@ mcolors = dict(m2colors.BASE_COLORS, **m2colors.CSS4_COLORS)
 saveall = True
 
 # print(plotly.__version__)
-print(matplotlib.__version__)
+# print(matplotlib.__version__)
 import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
@@ -98,7 +98,7 @@ def set_params_rates(file=None):
         params['m0'] = 6.5
         params['a_max'] = 15
 
-        params['resolution'] = 1.
+        params['time_resolution'] = 1.
         params['color'] = None
         params['input_m'] = []
         
@@ -106,9 +106,9 @@ def set_params_rates(file=None):
         params['TV0SR'] = params['x0']
         params['TV0SG'] = params['x0']
         
-        params['dynamics'] = 'updated_exp'
-        params['eps'] = (0., 1., 0.05) # mean, std, magnitude        
-        params['res'] = 150
+        params['dynamics'] = 'updated_exp_staticTS'
+        params['eps'] = (0., 1., 0.005) # mean, std, magnitude        
+        params['grid_resolution'] = 150
     
     return params
 
@@ -140,9 +140,15 @@ ins = np.array(
 
 params = set_params_rates()
 # params['input_m'].append(ins.tolist())
+
+if params['dynamics'] == 'updated_exp':
+    fdir = './noise_results_mswitch/'
+elif params['dynamics'] == 'updated_exp_staticTS':
+    fdir = './linear_noise_results_mswitch/'
+
 start = timeit.default_timer()
 
-numtrials = np.arange(128)
+numtrials = np.arange(8)
 
 memappend = [];
 
@@ -153,7 +159,7 @@ memappend = [];
 #     memappend.append(out)
 
 print(memappend)
-n_proc = mp.cpu_count() # // 2
+n_proc = mp.cpu_count() // 2
 chunksize = len(numtrials) // n_proc
 proc_chunks = []
 for i_proc in range(n_proc):
@@ -174,6 +180,7 @@ with mp.Pool(processes=n_proc) as pool:
 
 print(result_chunks)
 results = [item for sublist in result_chunks for item in sublist]
+print(results)
 results = np.array([i[0] for i in results])
 
 print(results)
@@ -185,8 +192,8 @@ print(len(results))
 
 label = np.random.randint(0,1000)
 
-np.save('./noise_results_mswitch/'+str(label) + '.P'+str(ptime)+'.N'+str(np.amax(numtrials))+'.npy', results)
-with open('./noise_results_mswitch/'+str(label) + '.P'+str(ptime)+'.N'+str(np.amax(numtrials))+'.json', 'w') as f:
+np.save(fdir + str(label) + '.P'+str(ptime)+'.N'+str(np.amax(numtrials))+'.npy', results)
+with open(fdir + str(label) + '.P'+str(ptime)+'.N'+str(np.amax(numtrials))+'.json', 'w') as f:
     f.write(json.dumps(params))
 
 end = timeit.default_timer()

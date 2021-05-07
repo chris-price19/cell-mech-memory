@@ -24,7 +24,8 @@ from matplotlib import colors as m2colors
 
 from numpy.random import Generator, PCG64
 
-from MMplotting import plot_PD_rates
+from MMplotting import plot_PD_rates, plot_PD_rates_v2
+
 # import warnings
 # ## importing and doing this to ignore warning in plt add_patch
 # warnings.filterwarnings("ignore", category=DeprecationWarning) 
@@ -97,15 +98,17 @@ def x_crit(n):
 
 def alpha_crit(m, params):
     n = params['n']
+    mscale = m/params['m0']
     km = f_m(m, {'type':params['km'], 'm0':params['m0'], 'g':params['g']})
     kc = f_m(m, {'type':params['kc'], 'm0':params['m0'], 'g':params['g']})
-    return (4 * n * (km + kc))/((n-1)**((n-1)/n)*(n+1)**((n+1)/n))
+    return ( -(mscale**params['g']/(mscale**params['g'] +1)) + 4 * n * (km + kc))/((n-1)**((n-1)/n)*(n+1)**((n+1)/n) ) 
 
 def m_crit_general(mc, params):
     # general to f(m)
+    # mscale = m/params['m0']
     km = f_m(mc, {'type':params['km'], 'm0':params['m0'], 'g':params['g']})
     kc = f_m(mc, {'type':params['kc'], 'm0':params['m0'], 'g':params['g']})
-    return km * x_total(alpha_crit(mc, params), params) - params['x_c'] * (km + kc) + alpha_crit(mc, params) * params['x_c']**params['n']/(params['x_c']**params['n']+1)
+    return km * x_total(alpha_crit(np.abs(mc), params), params) - params['x_c'] * (km + kc) + (alpha_crit(np.abs(mc), params) + (np.abs(mc)/params['m0'])**params['g']/((np.abs(mc)/params['m0'])**params['g'] +1)) * params['x_c']**params['n']/(params['x_c']**params['n']+1)
     # return (f_m(mc, params) - params['x_c']/params['tau'] + params['a_c'] * params['x_c']**params['n']/(params['x_c']**params['n']+1))
 
 def x_equil(x, m, alpha, params): 
@@ -203,17 +206,21 @@ def rle(inarray):
             p = np.cumsum(np.append(0, z))[:-1] # positions
             return(z, p, ia[i])
 
-def calc_PD_rates(params):
+def calc_PD_rates(params, display = False):
 
     if 'x_max' not in params.keys():
         params['x_max'] = params['x0']
 
-    a_space = np.linspace(0.01, params['a_max']+1, params['res'])
+    a_space = np.linspace(0.01, params['a_max']+1, int(params['grid_resolution']))
     params['a_space'] = a_space
-    x_space = np.linspace(0.01, np.amax([params['x_max']*1.5, 8.]), params['res'])
+    x_space = np.linspace(0.01, np.amax([params['x_max']*1.5, 8.]), int(params['grid_resolution']))
     params['x_space'] = x_space
     
     U_data, U_mins, x_arr_max, gmin_overm, b1_overm, b2_overm, inf_overm, capture2minima, capture_mvals, capmax, barrier_heights = collect_minima(U, params['m_space'], x_space, a_space, params)
+
+    if len(capture2minima) == 0 or len(capture_mvals) == 0 or len(capmax) == 0:
+        params['earlyexit'] = 1
+        return [], [], [], []
 
     cs = plt.contour(a_space, params['m_space'] / params['m0'], x_arr_max, levels=[params['x_c']])
     # plt.show()
@@ -222,7 +229,7 @@ def calc_PD_rates(params):
     # print(x_cvals)
     x_cvals = x_cvals[x_cvals[:,0] < np.amin(capture2minima),:]
 
-    gfig = plot_PD_rates(capture2minima, capmax, capture_mvals, x_cvals, params['m_space'], a_space, params)
+    # gfig = plot_PD_rates(capture2minima, capmax, capture_mvals, x_cvals, params['m_space'], a_space, params)
 
     # first col is m values, second col is low minima (blue), third col is high minima (red),
     mtst = np.concatenate((np.array(capture_mvals)[:,None] / params['m0'], np.array(capture2minima)[:,None], np.array(capmax)[:,None]), axis=1)
@@ -243,7 +250,10 @@ def calc_PD_rates(params):
     boostrez = griddata(highlines[:,0].squeeze(),highlines[:,1].squeeze(),boostgrid,method='linear')
     newhighlines = np.concatenate((boostgrid[:,None], boostrez[:,None]), axis=1)
 
-    # gfig.show()
+    gfig = plot_PD_rates_v2(newlowlines, newhighlines, params['m_space'], a_space, params)
+
+    if display:
+        gfig.show()
 
     # x_cvals is the dividing line between region 1 and region 2
     return mtst, x_cvals, newlowlines, newhighlines
@@ -293,7 +303,17 @@ def update_alpha(t_region, alpha, params):
             dalpha = -(alpha - params['a0'])/params['tau_F'] * params['dt']
 
         elif t_region[0] in [3]:
-            dalpha = -alpha/params['tau_SR'] * params['dt']        
+            dalpha = -alpha/params['tau_SR'] * params['dt']
+
+    elif params['dynamics'] == 'updated_exp_staticTS':
+        if t_region[0] in [2]:
+            dalpha = alpha/params['tau_SG'] * params['dt']
+
+        elif t_region[0] in [1]:
+            dalpha = -(alpha - params['a0'])/params['tau_F'] * params['dt']
+
+        elif t_region[0] in [3]:
+            dalpha = -alpha/params['tau_SR'] * params['dt']     
     else:
         dalpha = 0.    
 
@@ -308,65 +328,90 @@ def update_tau(params, x_prof, m_prof):
 
 def integrate_profile(m_profile, t_space, params, resultsDF):
 
+    params['earlyexit'] = 0
+
     if 'eps' not in params.keys():
         print('adding noise')
         params['eps'] = (0., 1., 0.)
     params['eps'] = noise(params['eps'][0], params['eps'][1], params['eps'][2])
 
-    # print('enter')
     kmdict = {'type':params['km'], 'm0':params['m0']}
     kcdict = {'type':params['kc'], 'm0':params['m0']}
 
     dt = params['dt']
     x_prof = np.zeros(len(t_space))
     alpha_prof = np.zeros(len(t_space))
-    active_region = []; t_primelist = []; t1maxlist = []; deltaVlist = []; tsg_list = []
+    active_region = []; t_primelist = []; tsr_list = []; deltaVlist = []; tsg_list = []
     t_region = [0,0] # (region, t)
     
-    mtst2, x_cvals, newlowlines, newhighlines = calc_PD_rates(params)  
+    mtst2, x_cvals, newlowlines, newhighlines = calc_PD_rates(params, display = False)
+
+    if np.isnan(newlowlines).any() or np.isnan(newhighlines).any() or params['earlyexit'] == 1:
+        print('see ya')
+        params['earlyexit'] = 1
+        return resultsDF, params
+
+    if np.amax(m_profile / params['m0']) < np.amax(newhighlines[:,1]) or np.amin(m_profile / params['m0']) > np.amax(newlowlines[:,1]):
+        print('bye')
+        params['earlyexit'] = 1
+        return resultsDF, params
 
     # plt.plot(newlowlines[:,0], newlowlines[:,1])
     # plt.plot(newhighlines[:,0], newhighlines[:,1])
     # plt.show()
-
-        # if np.isnan(mtst2).any() or np.amin(params['a_space']) > 0:
-    #     params['earlyexit'] = 1
-    #     return resultsDF, params
-
+    params['a_max'] = np.amax(newhighlines[:,0])
+    # print('amax2')
+    # print(params['a_max'])
     a_term = np.amax(mtst2[:,1])
 
     for ti, tt in enumerate(t_space):
 
-        # print(alpha_prof[ti-1])
-
-        current_m_ind = np.where(np.abs(params['m_space'] - m_profile[ti]) == np.amin(np.abs(params['m_space'] - m_profile[ti])))[0][0]
-
         if ti == 0:
-            x_prof[ti] = scipy.optimize.fsolve(x_equil, 1., args=(m_profile[ti], params['a0'], params), xtol=1e-10)[0]
             alpha_prof[ti] = params['a0']
+            axc_low = newlowlines[np.abs(newlowlines[:,0] - alpha_prof[ti]) == np.amin(np.abs(newlowlines[:,0] - alpha_prof[ti]))].squeeze()
+            axc_high = newhighlines[np.abs(newhighlines[:,0] - alpha_prof[ti]) == np.amin(np.abs(newhighlines[:,0] - alpha_prof[ti]))].squeeze()
+            # ensure that we start in region 1
+            if m_profile[ti] / params['m0'] >= axc_low[1]:
+                alpha_prof[ti] = axc_low[0] / 2
+                params['a0'] = alpha_prof[ti]
+
+            x_prof[ti] = scipy.optimize.fsolve(x_equil, 1., args=(m_profile[ti], params['a0'], params), xtol=1e-10)[0]
             continue;
 
         params['x_max'] = np.amax(x_prof)
-        xUd = np.linspace(0, params['x_max']*2.5, int(1e5))
+        xUd = np.linspace(0, params['x_max']*2.5, int(1e3))
 
         axc_low = newlowlines[np.abs(newlowlines[:,0] - alpha_prof[ti-1]) == np.amin(np.abs(newlowlines[:,0] - alpha_prof[ti-1]))].squeeze()
         axc_high = newhighlines[np.abs(newhighlines[:,0] - alpha_prof[ti-1]) == np.amin(np.abs(newhighlines[:,0] - alpha_prof[ti-1]))].squeeze()
+
+        try:
+            if m_profile[ti] / params['m0'] > axc_high[1]:
+                pass
+        except:
+            print('error')
+            print(m_profile[ti])
+            print(axc_high)
+            print(np.amin(axc_high,axis=0))
+            print(np.amax(axc_high,axis=0))
+            print(axc_high.shape)
+            # plt.plot(newhighlines[:,0], newhighlines[:,1])
+            axc_high = np.unique(axc_high, axis=0).squeeze()
+            # plt.show()
     
         if alpha_prof[ti-1] >= params['a_max']:
             print('max')
             # permanent memory;
             alpha_prof[ti] = params['a_max']
             x_prof[ti] = scipy.optimize.fsolve(x_equil, x_prof[ti-1], args=(m_profile[ti], alpha_prof[ti], params), xtol=1e-10)[0]
-            if m_profile[ti] / params['m0'] > axc_high[1]:
-                active_region.append(2)
-            else:
-                active_region.append(3)
+            # if m_profile[ti] / params['m0'] > axc_high[1]:
+            active_region.append(2)
+            # else:
+            #     active_region.append(3)
 
         else:
            
             if m_profile[ti] / params['m0'] < axc_low[1]:
             # region 1
-                # print('r1')
                 active_region.append(1)
 
                 if t_region[0] != 1:
@@ -375,16 +420,10 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
                 else:
                     t_region[1] += dt
                 
-                # if alpha_prof[ti-1] > params['a0']:
                 dalph = update_alpha(t_region, alpha_prof[ti-1], params)
-                # else:
-                    # dalph = 0.
                 alpha_prof[ti] = alpha_prof[ti-1] + dalph
-                # alpha_prof[ti] = a_mstar*np.exp((t_region[1]-4*params['tau_F'])/params['tau_SG'])
 
-            elif m_profile[ti] / params['m0'] > axc_high[1]: # and alpha_prof[ti-1] > axc_low[0] and m_profile[ti] / params['m0'] > axc_low[1]:
-                
-            # print('r2')
+            elif m_profile[ti] / params['m0'] > axc_high[1]:
             # region 2
                 active_region.append(2)
                 
@@ -405,14 +444,14 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
 
             else:
              # region 3
-                # print('r3')
                 active_region.append(3)
                 
                 if t_region[0] != 3:
                     if t_region[0] not in [3]:
                         # print('enter 6')
                         # print('tau_SG start %e' % (params['tau_SG']))
-                        params['tau_SR'] = params['tau_SG']
+                        if params['dynamics'] == 'updated_exp':
+                            params['tau_SR'] = params['tau_SG']
                         # print('tau_SR start %e' % (params['tau_SR']))
                         t_region[0] = 3
                         t_region[1] = dt
@@ -426,63 +465,36 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
 
             x_prof[ti] = scipy.optimize.fsolve(x_equil, x_prof[ti-1], args=(m_profile[ti], alpha_prof[ti], params), xtol=1e-10)[0]          
 
-        if t_region[0] in [2,3]: # and params['dynamics'] == 'exp_dynamicTS':
-
+        if t_region[0] in [2,3] and params['dynamics'] in ['updated_exp', 'exp_dynamicTS']:
             params = update_tau(params, x_prof[ti], m_profile[ti])
+
+        if t_region[0] == 3:
+
             # # finding the barrier height.
             # # energy slice over x at alpha, m
-            # U_data = U(f_m, m_profile[ti], xUd, alpha_prof[ti], params)
+            U_data = U(f_m, m_profile[ti], xUd, alpha_prof[ti], params)
+            x_args = find_peaks(-np.abs(np.diff(U_data)))[0]
+            deltaV = np.amax(U_data[x_args]) - np.amin(U_data[x_args])
+            if deltaV > 0:
+                deltaVlist.append(deltaV)
+            else:
+                deltaVlist.append(np.NaN)
 
-            # x_args = find_peaks(-np.abs(np.diff(U_data)))[0]
-            # stop = 0
-            # while len(x_args) < 2 and stop < 20 :
-            #     xUd = np.linspace(0., np.amax(xUd)+0.5, int(3e5))
-            #     U_data = U(f_m, m_profile[ti], xUd, alpha_prof[ti], params)
-            #     x_args = find_peaks(-np.abs(np.diff(U_data)))[0]
-            #     stop += 1
-
-            # if stop == 100:
-            #     print('Udata')
-            #     print(U_data)
-            #     np.save('failureU.npy', U_data)
-            #     print(x_args)
-            #     print(x_prof[ti])
-            #     print(np.amin(xUd))
-            #     print(np.amax(xUd))
-            #     # print(x_argmin)
-            #     print(alpha_prof[ti])
-            #     print(params)
-            #     print(m_profile[ti])
-            #     params['earlyexit'] = 1
-            #     return resultsDF, params
-
-            # deltaV = np.amax(U_data[x_args]) - np.amin(U_data[x_args])
-            # # print(deltaV)
-            # deltaVlist.append(deltaV)
             tsg_list.append(params['tau_SG'])
+            tsr_list.append(params['tau_SR'])
 
-            # if deltaV > 0:
-            #     # print(type(params['tau_SG']))
-            #     params['tau_SR'] = (params['tau_R0'] * np.exp(deltaV/params['TV0SR']))
-            #      # params['tau_SG'] = params['tau_R0'] * np.exp(-params['TV0']/deltaV)
-            #     params['tau_SG'] = (params['tau_R0'] * np.exp(deltaV/params['TV0SG']))
-            #     # we want t_sg to get larger w/ increasing depth so that it stops increasing               
-            # else:
-            #     print(deltaV)
-            deltaVlist.append(np.NaN)
-            #     tsg_list.append(params['tau_SG'])
+        else:
 
-        elif (t_region[0] in [1,3,4] and params['dynamics'] == 'exp_dynamicTS') or (params['dynamics'] != 'exp_dynamicTS'):
             deltaVlist.append(np.NaN)
             tsg_list.append(params['tau_SG'])
+            tsr_list.append(params['tau_SR'])
 
-    
-    # params['t_prime'] = (np.unique(t_primelist) + 4*params['tau_F']).tolist()
-    # params['t1max'] = (np.unique(t1maxlist) + 4*params['tau_F']).tolist()
+    # print(x_prof)
 
     active_region.insert(0, active_region[0])
     deltaVlist.insert(0, deltaVlist[0])
     tsg_list.insert(0, tsg_list[0])
+    tsr_list.insert(0, tsr_list[0])
 
     resultsDF['m_profile'] = m_profile
     resultsDF['t_space'] = t_space
@@ -491,132 +503,168 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
     resultsDF['active_region'] = active_region
     resultsDF['deltaV'] = deltaVlist
     resultsDF['tSG'] = tsg_list
+    resultsDF['tSR'] = tsr_list
 
     return resultsDF, params
 
-def summary_stats(resultsDF, params, verbose=True):
-    
+def summary_stats_v2(resultsDF, params, verbose=True):
+
     t = resultsDF['t_space'].values
     m = resultsDF['m_profile'].values
     alpha = resultsDF['alpha_prof'].values
     x = resultsDF['x_prof'].values
     active_region = resultsDF['active_region'].values
 
-    def slice_tuple(slice_):
-        return [slice_.start, slice_.stop, slice_.step]
-
-    if 'type' not in params.keys():
-        print('assuming stiff')
-        print('summary')
-        params['type'] = 'stiff'
-
-    # take the time series arrays and calculate observables.
-    dt = t[1] - t[0]
-
-    if params['type'] == 'stiff':
-        priming_mask = m / params['m0'] > params['m_c']
-    elif params['type'] == 'soft':
-        priming_mask = m / params['m0'] < params['m_c']
-    else:
-        print('no type')
-        return
-
-    regions = nd.find_objects(nd.label(priming_mask)[0])
-    # print([r for r in regions])
-    priming_times = [len(m[r]) * dt for r in regions]
-
-    # average priming stiffness
-    stiffP = np.array([np.mean(m[r]) for r in regions])
-
-    if len(stiffP) == 0:
-        # print(stiffP)
-        if np.amax(m) <= params['m_c'] * params['m0']:
-            print('no priming')
-            priming_times = np.array([np.NaN])
-            memory_times = np.array([np.NaN])
-            stiffA = np.array([0])
-            stiffP = np.array([0])
-
-            return priming_times, memory_times, stiffP, stiffA
-
-    priming_start_stop = np.array([slice_tuple(r[0]) for r in regions])
-    # print('&&&')
-    # print(params['dt'])
-    # print(priming_start_stop)
-    # print(priming_start_stop[:,1])
-
-    # memory time
-    # mem_start_candidates = [np.amax(t[r]) + dt for r in regions]
-    # print(mem_start_candidates)
-    memory_times = np.zeros(len(regions))
-
-    muniq = np.unique(m)
-    x_basic = np.zeros(len(muniq))
-    for mi, mm in enumerate(muniq):
-        x_basic[mi] = scipy.optimize.fsolve(x_equil, params['x0'], args=(mm, params['a0'], params), xtol=1e-10)[0]
-
-    # print(x_basic)
-    for mi, mm in enumerate(priming_start_stop[:,1]):
-        if mi == len(priming_start_stop) - 1:
-            end_ind = None
-            # print('here')
-        else:
-            end_ind = priming_start_stop[mi+1,0]
-            # print('there')
-
-        stiffy = m[mm:end_ind]
-        # average relaxation stiffness
-        stiffA = np.mean(stiffy)
-        x_compare = np.array([x_basic[muniq == ss][0] for ss in stiffy])
-        # print(x_compare)
-        # print(x[mm:end_ind])
-
-        # count as memory the time where the x expression is outside 5% of the target w/ baseline alpha
-        memory_times[mi] = np.sum(np.abs(x[mm:end_ind] - x_compare) > 0.05*x_compare) * dt
-        
-        # print(np.sum(np.abs(x[mm:end_ind] - x_compare) > 0.05*x_compare))    
+    if params['km'] == 'stiff':
+        priming_mask = (m / params['m0'] > np.mean(np.unique(m/params['m0']))) & (active_region == 2)
+        memory_mask = (m / params['m0'] < np.mean(np.unique(m/params['m0']))) & (active_region == 3)
+        perm_mask = (m / params['m0'] < np.mean(np.unique(m/params['m0']))) & (active_region == 2)
+    elif params['km'] == 'soft':
+        priming_mask = (m / params['m0'] < np.mean(np.unique(m/params['m0']))) & (active_region == 2)
     
+    priming_time = np.sum(priming_mask) * params['dt']
+    memory_time = np.sum(memory_mask) * params['dt']
+    perm_time = np.sum(perm_mask) * params['dt']
+
+    if perm_time > 0:
+        memory_time = -1.
+
+    pstiff = np.amax(m)
+    mstiff = np.amin(m)
+
     counts, cumsum, ids = rle(active_region) 
-    memory2 = np.sum(counts[np.isin(ids, [3])]) * params['dt']
-    priming2 = np.sum(counts[np.isin(ids, [2])]) * params['dt']
-
-    if ids[-1] == 2:
-        avgm = np.mean(np.unique(m))
-        priming2 = np.sum(m > avgm) * params['dt']
-        memory2 = -1.  # np.sum(m < avgm) * params['dt']
-        
-    # if np.abs(memory2 - memory_times[0]) > 24:
-    #     print('oh no')
-    #     print(priming_times)
-    #     print(priming2)
-    #     print(memory_times)
-    #     print(memory2)
-    #     print(counts)
-    #     print(ids)
-    #     print(priming_start_stop)
-        # sys.exit()
-
-    mech_stats = np.abs(stiffP - stiffA) / params['m0']
 
     if verbose:
         print('counts', end=" "); print(counts); print(np.sum(counts))
         print('ids', end=" "); print(ids)
-        print('priming times', end=" "); print(priming_times)
-        print('priming check', end = " "); print(priming2)
-        print('memory times', end=" "); print(memory_times)
-        print('memory check', end = " "); print(memory2)
-        print('mechanical ratios', end=" "); print(mech_stats)
+        print('priming times', end=" "); print(priming_time)
+        print('memory times', end=" "); print(memory_time)        
 
-    # print('memory times', end=" "); print(memory_times)
+    return np.array([priming_time]), np.array([memory_time]), np.array([pstiff]), np.array([mstiff])
 
-    # return np.array(priming_times), memory_times, stiffP, stiffA # mech_stats
-    return np.array([priming2]), np.array([memory2]), stiffP, stiffA
+# def summary_stats(resultsDF, params, verbose=True):
+    
+#     t = resultsDF['t_space'].values
+#     m = resultsDF['m_profile'].values
+#     alpha = resultsDF['alpha_prof'].values
+#     x = resultsDF['x_prof'].values
+#     active_region = resultsDF['active_region'].values
+
+#     def slice_tuple(slice_):
+#         return [slice_.start, slice_.stop, slice_.step]
+
+#     if 'type' not in params.keys():
+#         print('assuming stiff')
+#         print('summary')
+#         params['type'] = 'stiff'
+
+#     # take the time series arrays and calculate observables.
+#     dt = t[1] - t[0]
+
+#     if params['type'] == 'stiff':
+#         priming_mask = m / params['m0'] > params['m_c']
+#     elif params['type'] == 'soft':
+#         priming_mask = m / params['m0'] < params['m_c']
+#     else:
+#         print('no type')
+#         return
+
+#     regions = nd.find_objects(nd.label(priming_mask)[0])
+#     # print([r for r in regions])
+#     priming_times = [len(m[r]) * dt for r in regions]
+
+#     # average priming stiffness
+#     stiffP = np.array([np.mean(m[r]) for r in regions])
+
+#     if len(stiffP) == 0:
+#         # print(stiffP)
+#         if np.amax(m) <= params['m_c'] * params['m0']:
+#             print('no priming')
+#             priming_times = np.array([np.NaN])
+#             memory_times = np.array([np.NaN])
+#             stiffA = np.array([0])
+#             stiffP = np.array([0])
+
+#             return priming_times, memory_times, stiffP, stiffA
+
+#     priming_start_stop = np.array([slice_tuple(r[0]) for r in regions])
+#     # print('&&&')
+#     # print(params['dt'])
+#     # print(priming_start_stop)
+#     # print(priming_start_stop[:,1])
+
+#     # memory time
+#     # mem_start_candidates = [np.amax(t[r]) + dt for r in regions]
+#     # print(mem_start_candidates)
+#     memory_times = np.zeros(len(regions))
+
+#     muniq = np.unique(m)
+#     x_basic = np.zeros(len(muniq))
+#     for mi, mm in enumerate(muniq):
+#         x_basic[mi] = scipy.optimize.fsolve(x_equil, params['x0'], args=(mm, params['a0'], params), xtol=1e-10)[0]
+
+#     # print(x_basic)
+#     for mi, mm in enumerate(priming_start_stop[:,1]):
+#         if mi == len(priming_start_stop) - 1:
+#             end_ind = None
+#             # print('here')
+#         else:
+#             end_ind = priming_start_stop[mi+1,0]
+#             # print('there')
+
+#         stiffy = m[mm:end_ind]
+#         # average relaxation stiffness
+#         stiffA = np.mean(stiffy)
+#         x_compare = np.array([x_basic[muniq == ss][0] for ss in stiffy])
+#         # print(x_compare)
+#         # print(x[mm:end_ind])
+
+#         # count as memory the time where the x expression is outside 5% of the target w/ baseline alpha
+#         memory_times[mi] = np.sum(np.abs(x[mm:end_ind] - x_compare) > 0.05*x_compare) * dt
+        
+#         # print(np.sum(np.abs(x[mm:end_ind] - x_compare) > 0.05*x_compare))    
+    
+#     counts, cumsum, ids = rle(active_region) 
+#     memory2 = np.sum(counts[np.isin(ids, [3])]) * params['dt']
+#     priming2 = np.sum(counts[np.isin(ids, [2])]) * params['dt']
+
+#     if ids[-1] == 2:
+#         avgm = np.mean(np.unique(m))
+#         priming2 = np.sum(m > avgm) * params['dt']
+#         memory2 = -1.  # np.sum(m < avgm) * params['dt']
+#     # if np.abs(memory2 - memory_times[0]) > 24:
+#     #     print('oh no')
+#     #     print(priming_times)
+#     #     print(priming2)
+#     #     print(memory_times)
+#     #     print(memory2)
+#     #     print(counts)
+#     #     print(ids)
+#     #     print(priming_start_stop)
+#         # sys.exit()
+
+#     mech_stats = np.abs(stiffP - stiffA) / params['m0']
+
+#     if verbose:
+#         print('counts', end=" "); print(counts); print(np.sum(counts))
+#         print('ids', end=" "); print(ids)
+#         print('priming times', end=" "); print(priming_times)
+#         print('priming check', end = " "); print(priming2)
+#         print('memory times', end=" "); print(memory_times)
+#         print('memory check', end = " "); print(memory2)
+#         print('mechanical ratios', end=" "); print(mech_stats)
+
+#     # print('memory times', end=" "); print(memory_times)
+
+#     # return np.array(priming_times), memory_times, stiffP, stiffA # mech_stats
+#     return np.array([priming2]), np.array([memory2]), stiffP, stiffA
 
 
 def run_profile(e_func, inputs, params, resultsDF):
 
 
     def early_exit(resultsDF, params, m_profile, t_space):
+        print('out early')
         resultsDF['m_profile'] = m_profile
         resultsDF['t_space'] = t_space
         resultsDF['x_prof'] = np.ones(len(t_space))
@@ -641,6 +689,7 @@ def run_profile(e_func, inputs, params, resultsDF):
     
     m_c = scipy.optimize.fsolve(m_crit_general, 0.5, args=(params), xtol=1e-10)[0] / params['m0']
     params['m_c'] = m_c
+    # print(params['m_c'])
 
     # print(inputs)
     # print(type(inputs))
@@ -654,9 +703,9 @@ def run_profile(e_func, inputs, params, resultsDF):
         inputs[0,1] = m_c * params['m0'] - (-inputs[0,1]*m_c*params['m0'] * 0.9) 
         inputs[2,1] = m_c * params['m0'] - (-inputs[2,1]*m_c*params['m0'] * 0.9) 
 
-    m_profile = build_mprof(inputs, params['resolution'])
+    m_profile = build_mprof(inputs, params['time_resolution'])
 
-    m_space = np.linspace(np.amin([0.1, np.amin(m_profile)]), np.amax(m_profile)*1., params['res'])
+    m_space = np.linspace(np.amin([0.1, np.amin(m_profile)]), np.amax(m_profile)*1., int(params['grid_resolution']))
     choose_mc_ind = np.where(np.abs(m_space - m_c*params['m0']) == np.amin(np.abs(m_space-m_c*params['m0'])))[0][0]
     a_c = alpha_crit(m_space, params)
     params['a_c'] = a_c;
@@ -673,15 +722,20 @@ def run_profile(e_func, inputs, params, resultsDF):
     params['dt'] = t_space[1]-t_space[0]
 
     print(params['dynamics'])
+    # print(params['m_c'])
+    # print(params['a_c'])
 
-    if np.amin(m_profile)/params['m0'] >= params['m_c']: #/params['m0']:
-        early_exit(resultsDF, params, m_profile, t_space)
+    # if np.amin(m_profile)/params['m0'] >= params['m_c']: #/params['m0']:
+    #     early_exit(resultsDF, params, m_profile, t_space)
 
     resultsDF, params = e_func(m_profile, t_space, params, resultsDF)
 
-    if 'earlyexit' in params.keys():
-        early_exit(resultsDF, params, m_profile, t_space)
+    # print(params['a_max'])
 
-    priming_times, memory_times, stiffP, stiffA = summary_stats(resultsDF, params)
+    if 'earlyexit' in params.keys():
+        if params['earlyexit'] > 0:
+            early_exit(resultsDF, params, m_profile, t_space)
+
+    priming_times, memory_times, stiffP, stiffA = summary_stats_v2(resultsDF, params)
 
     return resultsDF, params, priming_times, memory_times, stiffP, stiffA

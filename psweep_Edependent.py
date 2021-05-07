@@ -20,6 +20,7 @@ import re
 
 import matplotlib.patches as patches
 from matplotlib import colors as m2colors
+from copy import deepcopy
 
 # import plotly
 # import plotly.graph_objects as go
