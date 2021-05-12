@@ -77,13 +77,12 @@ def run_sim(params, trials):
         
     return noiseDF, params, memout, primeout, pstiffout, mstiffout, amaxout
 
-def unpack_and_run(pgrid):
+def unpack_and_run(pgrid, trials):
     
     ingrid = pgrid.copy(deep=True)
     ingrid = ingrid.reset_index(drop=True)
     outgrid = pd.DataFrame()
     print(len(pgrid))
-    trials = 128
     for pi in np.arange(len(ingrid)):
 
         params = ingrid.iloc[pi].to_dict()
@@ -152,11 +151,22 @@ def set_params_rates(file=None):
 
 params = set_params_rates()
 
-loop_over = ['a0', 'm0', 'x0', 'tau_R0', 'kc', 'n', 'g']
-derivative = ['tau_F', 'tau_SG', 'TV0SR', 'TV0SG']
+if params['dynamics'] == 'updated_exp_staticTS':
+    params['tau_SG'] = np.array([48, 240])
+    params['tau_SR'] = np.array([120, 480])
+    params['tau_R0'] = 1
+    loop_over = ['a0', 'm0', 'x0', 'tau_SG', 'tau_SR', 'kc', 'n', 'g']
+    fdir = './linear_noise_results_mswitch/'    
+    # derivative = ['tau_F', V0SR', 'TV0SG']
+    # exclude = ['color', 'input_m', 'eps', 'tau_R0']
+else:
+    loop_over = ['a0', 'm0', 'x0', 'tau_R0', 'kc', 'n', 'g']
+    fdir = './noise_results_mswitch/'
+    # derivative = ['tau_F', 'tau_SG', 'TV0SR', 'TV0SG']
+
 exclude = ['color', 'input_m', 'eps']
 
-samples = lhs(len(loop_over), int(400))
+samples = lhs(len(loop_over), int(192))
 
 outputDF = pd.DataFrame()
 si = 0
@@ -176,10 +186,11 @@ for ki, key in enumerate(params.keys()):
 
 ## derivative columns
 # outputDF['tau_F'] = outputDF['tau'] #* 2.
-outputDF['tau_SG'] = outputDF['tau_R0']
-outputDF['tau_SR'] = outputDF['tau_R0']
-outputDF['TV0SG'] = outputDF['x0']
-outputDF['TV0SR'] = outputDF['x0']
+if params['dynamics'] != 'updated_exp_staticTS':
+    outputDF['tau_SG'] = outputDF['tau_R0']
+    outputDF['tau_SR'] = outputDF['tau_R0']
+    outputDF['TV0SG'] = outputDF['x0']
+    outputDF['TV0SR'] = outputDF['x0']
 
 ## noise
 
@@ -192,6 +203,7 @@ outputDF['eps'] = longeps
 
 concatframe = pd.DataFrame()
 primetimes = [72, 168, 240]
+trials = 100
 # primetimes = [180]
 
 for pi, pp in enumerate(primetimes):
@@ -240,7 +252,7 @@ assert sum(map(len, proc_chunks)) == len(outputDF)
 with mp.Pool(processes=n_proc) as pool:
     # starts the sub-processes without blocking
     # pass the chunk to each worker process
-    proc_results = [pool.apply_async(unpack_and_run, args=(chunk,)) for chunk in proc_chunks]
+    proc_results = [pool.apply_async(unpack_and_run, args=(chunk, trials,)) for chunk in proc_chunks]
 
     # blocks until all results are fetched
     result_chunks = [r.get() for r in proc_results]
@@ -255,7 +267,9 @@ print(results)
 
 end = timeit.default_timer()
 
-fname = './noise_results_mswitch/psweep_noise_trial'
+randlabel = np.random.randint(0,1000)
+
+fname = fdir + 'psweep_noise_trial_' + str(randlabel)
 results.loc[:, results.columns != 'input_m'].to_csv(fname+'.csv')
 np.save(fname+'_inputs.npy', results['input_m'].values)
 # test = np.load('inputs.npy', allow_pickle=True)

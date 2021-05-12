@@ -21,6 +21,7 @@ import sympy
 import cmath
 import matplotlib.patches as patches
 from matplotlib import colors as m2colors
+import plotly.graph_objects as go
 
 from numpy.random import Generator, PCG64
 
@@ -69,7 +70,10 @@ def x_total(a, params):
 def U(fm, m, x, a, params):
     km = fm(m, {'type':params['km'], 'm0':params['m0'], 'g':params['g']})
     kc = fm(m, {'type':params['kc'], 'm0':params['m0'], 'g':params['g']})
-    mscale = m/params['m0']
+    if params['km'] == 'soft':
+        mscale = params['m0']/m
+    else:
+        mscale = m/params['m0']
     return (
         (-km * x_total(a, params) - (a + mscale**params['g'] / (mscale**params['g']+1))) * x + x**2/2 * (km + kc) + (a + mscale**params['g'] / (mscale**params['g']+1)) * x * scipy.special.hyp2f1(1, 1/params['n'], 1+1/params['n'], -x**params['n']) 
     )
@@ -98,7 +102,10 @@ def x_crit(n):
 
 def alpha_crit(m, params):
     n = params['n']
-    mscale = m/params['m0']
+    if params['km'] == 'soft':
+        mscale = params['m0']/m
+    else:
+        mscale = m/params['m0']
     km = f_m(m, {'type':params['km'], 'm0':params['m0'], 'g':params['g']})
     kc = f_m(m, {'type':params['kc'], 'm0':params['m0'], 'g':params['g']})
     return ( -(mscale**params['g']/(mscale**params['g'] +1)) + 4 * n * (km + kc))/((n-1)**((n-1)/n)*(n+1)**((n+1)/n) ) 
@@ -116,7 +123,10 @@ def x_equil(x, m, alpha, params):
     # dynamic nuclear exit rate
     km = f_m(m, {'type':params['km'], 'm0':params['m0'], 'g':params['g']})
     kc = f_m(m, {'type':params['kc'], 'm0':params['m0'], 'g':params['g']})
-    mscale = m/params['m0']
+    if params['km'] == 'soft':
+        mscale = params['m0']/m
+    else:
+        mscale = m/params['m0']
     return km * x_total(alpha, params)  - x * (km + kc) + (alpha + mscale**params['g']/(mscale**params['g']+1)) * x**params['n']/(x**params['n']+1)
 
 def collect_minima(U, m_space, x_space, a_space, params):
@@ -219,7 +229,28 @@ def calc_PD_rates(params, display = False):
     U_data, U_mins, x_arr_max, gmin_overm, b1_overm, b2_overm, inf_overm, capture2minima, capture_mvals, capmax, barrier_heights = collect_minima(U, params['m_space'], x_space, a_space, params)
 
     if len(capture2minima) == 0 or len(capture_mvals) == 0 or len(capmax) == 0:
+        print('m_c exit?', end = ''); print(params['m_c'])
+        print(params)
         params['earlyexit'] = 1
+        if display:
+            choose_m = params['m0']
+            choose_m_ind = np.where(np.abs(params['m_space'] - choose_m) == np.amin(np.abs(params['m_space']-choose_m)))[0][0]
+            Uslice = U_data[choose_m_ind, :, :].squeeze()
+            xplot = x_space
+            aplot = a_space
+            uplot = Uslice # -U2_data
+
+            fig = go.Figure(data=[go.Surface(z=uplot.T, x=xplot, y=aplot, colorscale='blackbody',
+                                            cmin=np.amin(uplot)*0.8, cmax=np.amax(uplot)/6
+                                            )],
+                                 layout = go.Layout(paper_bgcolor='rgba(0,0,0,0)',
+                              plot_bgcolor='rgba(0,0,0,0)')
+                           )
+
+            # fig.update_traces(contours_z=dict(show=True, usecolormap=False,
+            #                                   project_z=True, start=np.amin(uplot) * 0.9, 
+            #                                   end=np.amax(uplot), color='black', size=0.09))
+            fig.show()
         return [], [], [], []
 
     cs = plt.contour(a_space, params['m_space'] / params['m0'], x_arr_max, levels=[params['x_c']])
@@ -321,14 +352,20 @@ def update_alpha(t_region, alpha, params):
 
 def update_tau(params, x_prof, m_prof):
 
-    params['tau_SR'] = params['tau_R0'] * params['m0']/m_prof * np.exp(x_prof/params['TV0SR'])
-    params['tau_SG'] = params['tau_R0'] * params['m0']/m_prof * np.exp(x_prof/params['TV0SG'])
+    if params['km'] == 'soft':
+        mscale = m_prof / params['m0']
+    else:
+        mscale = params['m0'] / m_prof
+
+    params['tau_SR'] = params['tau_R0'] * mscale * np.exp(x_prof/params['TV0SR'])
+    params['tau_SG'] = params['tau_R0'] * mscale * np.exp(x_prof/params['TV0SG'])
 
     return params
 
 def integrate_profile(m_profile, t_space, params, resultsDF):
 
     params['earlyexit'] = 0
+    errorflag = False; maxflag = False;
 
     if 'eps' not in params.keys():
         print('adding noise')
@@ -388,18 +425,25 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
             if m_profile[ti] / params['m0'] > axc_high[1]:
                 pass
         except:
-            print('error')
-            print(m_profile[ti])
-            print(axc_high)
-            print(np.amin(axc_high,axis=0))
-            print(np.amax(axc_high,axis=0))
-            print(axc_high.shape)
-            # plt.plot(newhighlines[:,0], newhighlines[:,1])
+
+            if not errorflag:
+                print('pd error')
+                print(params)            
+            
+            errorflag = True
             axc_high = np.unique(axc_high, axis=0).squeeze()
-            # plt.show()
-    
+
+        if params['m_c']*params['m0'] > 50 or params['m_c'] < 0:
+            if not errorflag:
+                print('m_c error')
+                print(params) 
+            errorflag = True
+
         if alpha_prof[ti-1] >= params['a_max']:
-            print('max')
+            if not maxflag:
+                print('max')
+                print(params)
+            maxflag = True
             # permanent memory;
             alpha_prof[ti] = params['a_max']
             x_prof[ti] = scipy.optimize.fsolve(x_equil, x_prof[ti-1], args=(m_profile[ti], alpha_prof[ti], params), xtol=1e-10)[0]
@@ -466,6 +510,7 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
             x_prof[ti] = scipy.optimize.fsolve(x_equil, x_prof[ti-1], args=(m_profile[ti], alpha_prof[ti], params), xtol=1e-10)[0]          
 
         if t_region[0] in [2,3] and params['dynamics'] in ['updated_exp', 'exp_dynamicTS']:
+            # print('tau')
             params = update_tau(params, x_prof[ti], m_profile[ti])
 
         if t_region[0] == 3:
@@ -540,7 +585,7 @@ def summary_stats_v2(resultsDF, params, verbose=True):
         print('priming times', end=" "); print(priming_time)
         print('memory times', end=" "); print(memory_time)        
 
-    return np.array([priming_time]), np.array([memory_time]), np.array([pstiff]), np.array([mstiff])
+    return np.array(priming_time), np.array(memory_time), np.array(pstiff), np.array(mstiff)
 
 # def summary_stats(resultsDF, params, verbose=True):
     

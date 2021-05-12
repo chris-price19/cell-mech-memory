@@ -207,115 +207,115 @@ def plot_profile(fig, ax, resultsDF, params, x_solve, colors=[mcolors['darkorang
     return params, fig, ax # fig2,
     
 
-def plot_PD_rates(capture2minima, capmax, capture_mvals, x_cvals, m_space, a_space, params):
+# def plot_PD_rates(capture2minima, capmax, capture_mvals, x_cvals, m_space, a_space, params):
 
-    a_c = np.array(params['a_c'])
-    m_c = params['m_c']
-    mc_ind = np.where(np.abs(m_space/ params['m0'] - m_c) == np.amin(np.abs(m_space/ params['m0']-m_c)))[0][0]
+#     a_c = np.array(params['a_c'])
+#     m_c = params['m_c']
+#     mc_ind = np.where(np.abs(m_space/ params['m0'] - m_c) == np.amin(np.abs(m_space/ params['m0']-m_c)))[0][0]
 
-    gfig = go.Figure().update_layout(
-            template="simple_white",
-            width=600, height=600,
-            xaxis = dict(range=[0., 4.], mirror=True, showline=True),
-            yaxis = dict(range=[np.amin(capture_mvals), 1.25], mirror=False, showline=True),
-            # yaxis = dict(range=[0., 1.5], mirror=True, showline=True),
-            font=dict(
-                # family="Courier New, monospace",
-                size=18,
-                # color="RebeccaPurple"
-                ),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            showlegend=False
-            )
+#     gfig = go.Figure().update_layout(
+#             template="simple_white",
+#             width=600, height=600,
+#             xaxis = dict(range=[0., 4.], mirror=True, showline=True),
+#             yaxis = dict(range=[np.amin(capture_mvals), 1.25], mirror=False, showline=True),
+#             # yaxis = dict(range=[0., 1.5], mirror=True, showline=True),
+#             font=dict(
+#                 # family="Courier New, monospace",
+#                 size=18,
+#                 # color="RebeccaPurple"
+#                 ),
+#             paper_bgcolor='rgba(0,0,0,0)',
+#             plot_bgcolor='rgba(0,0,0,0)',
+#             showlegend=False
+#             )
 
-    xlims = gfig.layout.xaxis.range; ylims = gfig.layout.yaxis.range
-    capture_mvals = np.array(capture_mvals)
-
-
-    #### fills
-
-    ## bottom
-    xx = np.concatenate((capture2minima, capmax, )) # np.array([xlims[1], np.amin(capture2minima)])
-    yy = np.concatenate((capture_mvals, capture_mvals,)) / params['m0'] #  np.array([ylims[0], ylims[0]])
-
-    gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]), 
-                              y=np.append(np.array(capture_mvals)/params['m0'], [m_c]),
-                        mode='none',  fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
-                        )
-                  )
-    gfig.add_trace(go.Scatter(x=capmax, 
-                             y=capture_mvals / params['m0'],
-                        mode='none', fill='tonextx', fillcolor='rgba(15, 32, 128, 1)'
-                             )
-                  )
-    ## top
-    # xx = [np.amax(a_c), xlims[1], xlims[1], a_c[mc_ind]]
-    # xx = np.concatenate((
-    #     a_c[m_space/params['m0']>m_c], [xlims[1], xlims[1]], capmax
-    # ))
-
-    # yy = [m_space[-1]/params['m0'], m_space[-1]/params['m0'], np.amin(capmax)/params['m0'], m_c]
-    # yy = np.concatenate((
-    #     m_space/params['m0'], [m_space[-1]/params['m0'], np.amin(capture_mvals)/params['m0']], capture_mvals
-    # ))
-    # gfig.add_trace(go.Scatter(
-    #                     x=xx,
-    #                     y=yy,
-    #                     mode='none', fill='toself', fillcolor='rgba(255, 0, 0, 0.3)'
-    #                 )
-    # #                                      line=dict(color='green', width=4))
-    #               )
-
-    # gfig.add_trace(go.Scatter(
-    #                     x=np.concatenate((a_c[m_space/params['m0']>m_c], np.array([a_space[0]]))),
-    #                     y=np.concatenate((m_space[m_space/params['m0']>m_c], np.array([m_space[-1]]))) / params['m0'],
-    #                     mode='none', fill='tozerox', fillcolor='rgba(148, 0,211, 0.3)'
-    #                 )
-    # #                                      line=dict(color='green', width=4))
-    #               )
+#     xlims = gfig.layout.xaxis.range; ylims = gfig.layout.yaxis.range
+#     capture_mvals = np.array(capture_mvals)
 
 
-    #### lines
-    # gfig.add_trace(go.Scatter(
-    #                     x=a_c[a_c >= a_c[mc_ind]],
-    #                     y=m_space[a_c >= a_c[mc_ind]] / params['m0'],
-    #                     mode='lines', line=dict(color='green', width=4)
-    #                     )              
-    #               )
+#     #### fills
 
-    gfig.add_trace(go.Scatter(
-                        x=x_cvals[x_cvals[:,0] < np.amin(capture2minima),0],
-                        y=x_cvals[x_cvals[:,0] < np.amin(capture2minima),1],
-                        mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6), fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
+#     ## bottom
+#     xx = np.concatenate((capture2minima, capmax, )) # np.array([xlims[1], np.amin(capture2minima)])
+#     yy = np.concatenate((capture_mvals, capture_mvals,)) / params['m0'] #  np.array([ylims[0], ylims[0]])
 
-                        )              
-                  )
-    # gfig.add_trace(go.Scatter(
-    #                     x=a_c[a_c <= a_c[mc_ind]],
-    #                     y=m_space[a_c <= a_c[mc_ind]] / params['m0'],
-    #                     mode='lines', line=dict(color='green', width=4, dash='dot')
-    #                     )              
-    #               )
+#     gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]), 
+#                               y=np.append(np.array(capture_mvals)/params['m0'], [m_c]),
+#                         mode='none',  fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
+#                         )
+#                   )
+#     gfig.add_trace(go.Scatter(x=capmax, 
+#                              y=capture_mvals / params['m0'],
+#                         mode='none', fill='tonextx', fillcolor='rgba(15, 32, 128, 1)'
+#                              )
+#                   )
+#     ## top
+#     # xx = [np.amax(a_c), xlims[1], xlims[1], a_c[mc_ind]]
+#     # xx = np.concatenate((
+#     #     a_c[m_space/params['m0']>m_c], [xlims[1], xlims[1]], capmax
+#     # ))
 
-    gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]),
-                              y=np.append(np.array(capture_mvals), [m_space[mc_ind]]) / params['m0'],
-                        mode='lines',line=dict(color='rgba(78, 247, 75, 1)', width=6),
-                             )
-                  )
+#     # yy = [m_space[-1]/params['m0'], m_space[-1]/params['m0'], np.amin(capmax)/params['m0'], m_c]
+#     # yy = np.concatenate((
+#     #     m_space/params['m0'], [m_space[-1]/params['m0'], np.amin(capture_mvals)/params['m0']], capture_mvals
+#     # ))
+#     # gfig.add_trace(go.Scatter(
+#     #                     x=xx,
+#     #                     y=yy,
+#     #                     mode='none', fill='toself', fillcolor='rgba(255, 0, 0, 0.3)'
+#     #                 )
+#     # #                                      line=dict(color='green', width=4))
+#     #               )
 
-    # gfig.add_trace(go.Scatter(x=[np.amin(a_space), np.amax(a_space)], y=[m_c, m_c], # a_c[mc_ind]
-    #                     mode='lines', line=dict(color='red', width=4, dash='dot'),
-    #                          )
-    #               )
+#     # gfig.add_trace(go.Scatter(
+#     #                     x=np.concatenate((a_c[m_space/params['m0']>m_c], np.array([a_space[0]]))),
+#     #                     y=np.concatenate((m_space[m_space/params['m0']>m_c], np.array([m_space[-1]]))) / params['m0'],
+#     #                     mode='none', fill='tozerox', fillcolor='rgba(148, 0,211, 0.3)'
+#     #                 )
+#     # #                                      line=dict(color='green', width=4))
+#     #               )
 
-    gfig.add_trace(go.Scatter(x=np.append(capmax, a_c[mc_ind]), 
-                             y=np.append(np.array(capture_mvals), m_space[mc_ind]) / params['m0'],
-                        mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6),
-                             )
-                  )
 
-    return gfig
+#     #### lines
+#     # gfig.add_trace(go.Scatter(
+#     #                     x=a_c[a_c >= a_c[mc_ind]],
+#     #                     y=m_space[a_c >= a_c[mc_ind]] / params['m0'],
+#     #                     mode='lines', line=dict(color='green', width=4)
+#     #                     )              
+#     #               )
+
+#     gfig.add_trace(go.Scatter(
+#                         x=x_cvals[x_cvals[:,0] < np.amin(capture2minima),0],
+#                         y=x_cvals[x_cvals[:,0] < np.amin(capture2minima),1],
+#                         mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6), fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
+
+#                         )              
+#                   )
+#     # gfig.add_trace(go.Scatter(
+#     #                     x=a_c[a_c <= a_c[mc_ind]],
+#     #                     y=m_space[a_c <= a_c[mc_ind]] / params['m0'],
+#     #                     mode='lines', line=dict(color='green', width=4, dash='dot')
+#     #                     )              
+#     #               )
+
+#     gfig.add_trace(go.Scatter(x=np.append(capture2minima, [a_c[mc_ind]]),
+#                               y=np.append(np.array(capture_mvals), [m_space[mc_ind]]) / params['m0'],
+#                         mode='lines',line=dict(color='rgba(78, 247, 75, 1)', width=6),
+#                              )
+#                   )
+
+#     # gfig.add_trace(go.Scatter(x=[np.amin(a_space), np.amax(a_space)], y=[m_c, m_c], # a_c[mc_ind]
+#     #                     mode='lines', line=dict(color='red', width=4, dash='dot'),
+#     #                          )
+#     #               )
+
+#     gfig.add_trace(go.Scatter(x=np.append(capmax, a_c[mc_ind]), 
+#                              y=np.append(np.array(capture_mvals), m_space[mc_ind]) / params['m0'],
+#                         mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6),
+#                              )
+#                   )
+
+#     return gfig
 
 
 def plot_PD_rates_v2(lowlines, highlines, m_space, a_space, params):

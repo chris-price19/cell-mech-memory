@@ -159,7 +159,7 @@ memappend = [];
 #     memappend.append(out)
 
 print(memappend)
-n_proc = mp.cpu_count() // 2
+n_proc = mp.cpu_count() # // 2
 chunksize = len(numtrials) // n_proc
 proc_chunks = []
 for i_proc in range(n_proc):
@@ -178,10 +178,11 @@ with mp.Pool(processes=n_proc) as pool:
     # blocks until all results are fetched
     result_chunks = [r.get() for r in proc_results]
 
-print(result_chunks)
-results = [item for sublist in result_chunks for item in sublist]
-print(results)
-results = np.array([i[0] for i in results])
+results = pd.concat(result_chunks)
+# print(result_chunks)
+# results = [item for sublist in result_chunks for item in sublist]
+# print(results)
+# results = np.array([i[0] for i in results])
 
 print(results)
 print(len(results))
