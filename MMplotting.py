@@ -386,6 +386,74 @@ def plot_PD_rates_v2(lowlines, highlines, m_space, a_space, params):
     return gfig
 
 
+def plot_PD_rates_soft(lowlines, highlines, m_space, a_space, params):
+
+    a_c = np.array(params['a_c'])
+    m_c = params['m_c']
+    # mc_ind = np.where(np.abs(m_space/ params['m0'] - m_c) == np.amin(np.abs(m_space/ params['m0']-m_c)))[0][0]
+
+    gfig = go.Figure().update_layout(
+            template="simple_white",
+            width=600, height=600,
+            xaxis = dict(range=[0., 4.], mirror=True, showline=True),
+            yaxis = dict(range=[0., 6.], mirror=False, showline=True),
+            # yaxis = dict(range=[0., 1.5], mirror=True, showline=True),
+            font=dict(
+                # family="Courier New, monospace",
+                size=18,
+                # color="RebeccaPurple"
+                ),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            showlegend=False
+            )
+
+    xlims = gfig.layout.xaxis.range; ylims = gfig.layout.yaxis.range
+    # capture_mvals = np.array(capture_mvals)
+
+
+    #### fills
+
+    ## bottom
+    # xx = np.concatenate((capture2minima, capmax, )) # np.array([xlims[1], np.amin(capture2minima)])
+    # yy = np.concatenate((capture_mvals, capture_mvals,)) / params['m0'] #  np.array([ylims[0], ylims[0]])
+
+    gfig.add_trace(go.Scatter(x=lowlines[:,0], 
+                              y=lowlines[:,1],
+                        mode='none',  fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
+                        )
+                  )
+    gfig.add_trace(go.Scatter(x=highlines[:,0], 
+                             y=highlines[:,1],
+                        mode='none', fill='tonextx', fillcolor='rgba(15, 32, 128, 1)'
+                             )
+                  )
+
+
+    # gfig.add_trace(go.Scatter(
+    #                     x=x_cvals[x_cvals[:,0] < np.amin(capture2minima),0],
+    #                     y=x_cvals[x_cvals[:,0] < np.amin(capture2minima),1],
+    #                     mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6), fill='tozerox', fillcolor='rgba(245, 121, 58, 1)'
+
+    #                     )              
+    #               )
+
+    gfig.add_trace(go.Scatter(x=lowlines[:,0],
+                              y=lowlines[:,1],
+                        mode='lines',line=dict(color='rgba(78, 247, 75, 1)', width=6),
+                             )
+                  )
+
+
+    gfig.add_trace(go.Scatter(x=highlines[:,0], 
+                             y=highlines[:,1],
+                        mode='lines', line=dict(color='rgba(78, 247, 75, 1)', width=6),
+                             )
+                  )
+
+    return gfig
+
+
 def plot_memcorr(memDF, subcols, prettylabel, ax):
         
         def autolabel(rects):

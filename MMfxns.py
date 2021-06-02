@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import math
-import numpy as np
 import scipy
 from scipy.signal import argrelextrema, find_peaks
 from scipy.interpolate import griddata
@@ -25,7 +24,7 @@ import plotly.graph_objects as go
 
 from numpy.random import Generator, PCG64
 
-from MMplotting import plot_PD_rates, plot_PD_rates_v2
+from MMplotting import plot_PD_rates_v2 # plot_PD_rates,
 
 # import warnings
 # ## importing and doing this to ignore warning in plt add_patch
@@ -36,7 +35,7 @@ sns.set(style="ticks", font_scale=1.5)
 mcolors = dict(m2colors.BASE_COLORS, **m2colors.CSS4_COLORS)
 
 class noise:
-    def __init__(self, mean=0., std = 1., mag = 0.1):
+    def __init__(self, mean=0., std = 1., mag = 0.01):
         self.mean = mean
         self.std = std
         self.mag = mag
@@ -49,7 +48,7 @@ def f_m(m, params):
         if params['type'] == 'stiff':
             return 1 - np.exp(-m/params['m0'])  + 0.4
         if params['type'] == 'soft':
-            return 1 - np.exp(-params['m0']/m)
+            return 1 - np.exp(-params['m0']/m) + 0.3
         if params['type'] ==  'basic':
             return m/params['m0']
         if params['type'] == 'linear':
@@ -218,6 +217,19 @@ def rle(inarray):
 
 def calc_PD_rates(params, display = False):
 
+    def smooth(y, box_pts):
+        # print(y.shape)
+        box = np.ones(box_pts)/box_pts
+        # y_smooth = np.hstack((np.convolve(y[:,0], box, mode='same'), np.convolve(y[:,1], box, mode='same'))).squeeze()
+        # print(y_smooth.shape)
+
+        cumsum_vec = np.cumsum(np.insert(y, 0, 0, axis=0), axis=0)
+        ma_vec = (cumsum_vec[box_pts:,:] - cumsum_vec[:-box_pts,:]) / box_pts
+        # print(ma_vec.shape)
+        # ma_vec = np.unique(ma_vec, axis=0)
+        # print(ma_vec.shape)
+        return ma_vec
+
     if 'x_max' not in params.keys():
         params['x_max'] = params['x0']
 
@@ -267,17 +279,19 @@ def calc_PD_rates(params, display = False):
 
     lowlines = np.concatenate((x_cvals,mtst[:,[1,0]]), axis=0)
     lowlines = lowlines[lowlines[:,0].argsort()]
+    lowlines = smooth(lowlines, 5)
     # print(lowlines)
 
-    boostgrid = np.linspace(np.amin(lowlines[:,0]),np.amax(lowlines[:,0]),int(1000))
+    boostgrid = np.linspace(np.amin(lowlines[:,0]),np.amax(lowlines[:,0]),int(params['grid_resolution']*3))
     boostrez = griddata(lowlines[:,0].squeeze(),lowlines[:,1].squeeze(),boostgrid,method='linear')
     newlowlines = np.concatenate((boostgrid[:,None], boostrez[:,None]), axis=1)
     # print(newlowlines)
 
     highlines = np.concatenate((x_cvals,mtst[:,[2,0]]), axis=0)
     highlines = highlines[highlines[:,0].argsort()]
+    highlines = smooth(highlines, 5)
 
-    boostgrid = np.linspace(np.amin(highlines[:,0]),np.amax(highlines[:,0]),int(1000))
+    boostgrid = np.linspace(np.amin(highlines[:,0]),np.amax(highlines[:,0]),int(params['grid_resolution']*3))
     boostrez = griddata(highlines[:,0].squeeze(),highlines[:,1].squeeze(),boostgrid,method='linear')
     newhighlines = np.concatenate((boostgrid[:,None], boostrez[:,None]), axis=1)
 
@@ -571,7 +585,7 @@ def summary_stats_v2(resultsDF, params, verbose=True):
     memory_time = np.sum(memory_mask) * params['dt']
     perm_time = np.sum(perm_mask) * params['dt']
 
-    if perm_time > 0:
+    if perm_mask[-1]: # perm_time > 0:
         memory_time = -1.
 
     pstiff = np.amax(m)
