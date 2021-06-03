@@ -123,7 +123,7 @@ if params['dynamics'] == 'updated_exp_staticTS':
     # exclude = ['color', 'input_m', 'eps', 'tau_R0']
 else:
     loop_over = ['a0', 'm0', 'x0', 'tau_R0', 'kc', 'n', 'g', 'input_primetime']
-    fdir = './update_exp/'
+    fdir = './updated_exp/'
     # derivative = ['tau_F', 'tau_SG', 'TV0SR', 'TV0SG']
 
 exclude = ['color', 'input_m', 'eps']
