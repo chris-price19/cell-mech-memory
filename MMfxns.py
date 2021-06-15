@@ -422,6 +422,16 @@ def integrate_profile(m_profile, t_space, params, resultsDF):
             axc_low = newlowlines[np.abs(newlowlines[:,0] - alpha_prof[ti]) == np.amin(np.abs(newlowlines[:,0] - alpha_prof[ti]))].squeeze()
             axc_high = newhighlines[np.abs(newhighlines[:,0] - alpha_prof[ti]) == np.amin(np.abs(newhighlines[:,0] - alpha_prof[ti]))].squeeze()
             # ensure that we start in region 1
+            if hasattr(axc_low[1], "__len__"):
+                print('bye')
+                params['earlyexit'] = 1
+                print(axc_low)
+                print('----')
+                print(axc_high)
+                print('----')
+                print(params)
+                return resultsDF, params
+                
             if m_profile[ti] / params['m0'] >= axc_low[1]:
                 alpha_prof[ti] = axc_low[0] / 2
                 params['a0'] = alpha_prof[ti]

@@ -1,5 +1,13 @@
 #!/usr/bin/python
 
+"""
+
+Figure S3
+Plot examples of linear and nonlinear dynamics
+
+
+"""
+
 import math
 import numpy as np
 import scipy
