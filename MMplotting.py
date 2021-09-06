@@ -140,13 +140,13 @@ def plot_profile(fig, ax, resultsDF, params, x_solve, colors=[mcolors['darkorang
     ## a_c
     # lc3 = atwin.plot([t[0],t[-1]],[params['a_c'][mc_ind],params['a_c'][mc_ind]],color = mcolors['green'], linestyle='-.', linewidth=2., label='\u03b1$_{c}$', zorder=4)
     ## x_c
-    lc3 = ax[1].plot([t[0],100],[params['x_c'],params['x_c']],color = mcolors['lime'], linestyle='--', linewidth=2., label='x$_{c}$', zorder=4)
+    # lc3 = ax[1].plot([t[0],100],[params['x_c'],params['x_c']],color = mcolors['lime'], linestyle='--', linewidth=2., label='x$_{c}$', zorder=4)
 
 
     ## legend
     lns = lc1+lc2 +lc4 #+ lc4
     labs = [l.get_label() for l in lns]
-    ax[1].legend(lns, labs, loc='lower right')
+    ax[1].legend(lns, labs, loc='upper right')
     # ax[1].set_xlabel('time (hours)')
     # ax[1].yaxis.label.set_color('k')
     # ax[1].tick_params(axis='y', colors='k')
