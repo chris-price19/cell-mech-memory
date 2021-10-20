@@ -45,16 +45,17 @@ def unpack_and_run(pgrid):
         # print(type(priming_times))
         outgrid.at[pi,'mem_time'] = memory_times
         # print(pgrid)
-        outgrid.at[pi,'prime_time'] = priming_times
+        outgrid.at[pi,'result_prime_time'] = priming_times
         outgrid.at[pi,'mem_stiff'] = stiffA
         outgrid.at[pi,'prime_stiff'] = stiffP
+        outgrid.at[pi,'a_max'] = params['a_max']
 
         outgrid.at[pi,'x_c'] = params['x_c']
-        outgrid.at[pi,'a_c'] = params['a_c']
         outgrid.at[pi,'m_c'] = params['m_c']
+        
         # outgrid.at[pi,'t1max'] = params['t1max']
         # outgrid.at[pi,'t_prime'] = params['t_prime']
-        outgrid.at[pi,'dt'] = params['dt']
+        # outgrid.at[pi,'dt'] = params['dt']
 
     # outgrid.index = pgrid.index
 
@@ -74,64 +75,91 @@ saveall = True
 import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning) 
 
-#### Energy dependent alpha increase and decrease
-params = {}
-resultsDF = pd.DataFrame(columns=['m_profile','t_space','x_prof','alpha_prof','active_region','deltaV'])
+def set_params_rates(file=None):
+    params = {}
+    if file:
+        with open(file, 'r') as f:
+            params = json.load(f)
+    else:
+      # params['tau'] = .98
+        params['tau_F'] = 12. # params['tau'] * 2
+        params['tau_SG'] = 200. #params['tau'] * 150
+        params['tau_SR'] = params['tau_SG']
+        
+        params['kc'] = np.array([0.8, 2.]) # 1.5
+        params['km'] = 'stiff'      
+        params['x0'] = np.array([0.9, 2.5]) # 1.9
+        params['a0'] = np.array([0.2, 1.2]) # 1.; 
+        params['xtt'] = 0.
+        params['g'] = np.array([10, 50]) # 35
+        params['n'] = np.array([3, 8]) # 6        
+        params['m0'] = np.array([4.5, 8.]) # 6.5
+        params['a_max'] = 15
 
-params['tau'] = np.array([0.6, 1.4]) #, 5.)
-params['tau_F'] = 1.
-params['tau_SG'] = 300
-#
-params['m0'] = np.array([2., 10.])
-params['x0'] = 0.2
-params['a0'] = 0.5
-params['a_max'] = 50
-params['n'] = np.array([2.,6.])
-params['resolution'] = .5     # hours per timestep
-params['type'] = 'stiff'
-params['color'] = None
-# params['input_m'] = []
+        params['time_resolution'] = 1.
+        params['color'] = None
+        params['input_m'] = []
+        
+        params['tau_R0'] = np.array([48, 240])  # 130 
+        params['TV0SR'] = 1 # params['x0']
+        params['TV0SG'] = 1 # params['x0']
+        
+        params['dynamics'] = 'updated_exp'
+        params['eps'] = (0., 1., 0.05) # mean, std, magnitude        
+        params['grid_resolution'] = 150
+        params['input_primetime'] = np.array([48, 320])
+    
+    return params
 
-params['tau_R0'] = np.array([48., 800.])
-params['TV0SR'] = np.array([0.005, 1.00])
-params['TV0SG'] = np.array([0.005, 2.00])
+params = set_params_rates()
 
-params['t_prime'] = 0.
-params['t1max'] = 0.
+if params['dynamics'] == 'updated_exp_staticTS':
+    params['tau_SG'] = np.array([48, 240])
+    params['tau_SR'] = np.array([120, 480])
+    params['tau_R0'] = 1
+    loop_over = ['a0', 'm0', 'x0', 'tau_SG', 'tau_SR', 'kc', 'n', 'g', 'input_primetime']
+    fdir = './updated_exp_staticTS/'    
+    # derivative = ['tau_F', V0SR', 'TV0SG']
+    # exclude = ['color', 'input_m', 'eps', 'tau_R0']
+else:
+    loop_over = ['a0', 'm0', 'x0', 'tau_R0', 'kc', 'n', 'g', 'input_primetime']
+    fdir = './updated_exp/'
+    # derivative = ['tau_F', 'tau_SG', 'TV0SR', 'TV0SG']
 
-params['x_c'] = 0.; params['a_c'] = 0.; params['m_c'] = 0.; params['dt'] = 0.
+exclude = ['color', 'input_m', 'eps']
 
-params['ptime'] = np.array([48, 480])
-params['dynamics'] = 'exp_dynamicTS'
-# params['pstiff'] = np.array([48, 480])
-
-loop_over = ['m0','tau_R0','TV0SG','TV0SR','tau','ptime', 'n']
-derivative = ['tau_F', 'tau_SG', 'pstiff', 'mstiff']
-exclude = ['color'] # 'color', 'type'
-
-samples = lhs(len(loop_over), int(10e4))
+samples = lhs(len(loop_over), int(40000))
 
 outputDF = pd.DataFrame()
 si = 0
 for ki, key in enumerate(params.keys()):
     if key in loop_over:
-        # print(key)
-        # print(params[key])
+        print(key)
+        print(params[key])
         outputDF[key] = samples[:,si] * np.diff(params[key]) + np.amin(params[key])
         si += 1
     elif key not in exclude:
         if isinstance(params[key], str):
             outputDF[key] = params[key]
         else:
-            # print(key)
+            print(key)
             # print(params[key])
             outputDF[key] = np.ones(len(samples[:,0])) * params[key]
 
 ## derivative columns
-outputDF['tau_F'] = outputDF['tau'] #* 2.
-outputDF['tau_SG'] = outputDF['tau_R0']
-outputDF['tau_SR'] = outputDF['tau_R0']
+# outputDF['tau_F'] = outputDF['tau'] #* 2.
+if params['dynamics'] != 'updated_exp_staticTS':
+    outputDF['tau_SG'] = outputDF['tau_R0']
+    outputDF['tau_SR'] = outputDF['tau_R0']
+    outputDF['TV0SG'] = outputDF['x0']
+    outputDF['TV0SR'] = outputDF['x0']
 
+longeps = [
+    (0., 0.,  0.)
+        for pi in np.arange(len(outputDF))
+    ]
+
+outputDF['eps'] = longeps
 ## sample stiffnesses
 
 rand1 = np.random.uniform(0., 1., size=len(outputDF))
@@ -142,18 +170,18 @@ ins = [
     np.array(
     [
         [24, -rand1[pi]],
-        [outputDF['ptime'].iloc[pi], -rand2[pi]],
-        [np.amax(params['ptime'])*10, -rand1[pi]],
+        [outputDF['input_primetime'].iloc[pi], -rand2[pi]],
+        [np.amax(params['input_primetime'])*10, -rand1[pi]],
     ]
         ) for pi in np.arange(len(outputDF))
     ]
 
 # params['input_m'] = ins #[ins[i].tolist() for i in ins]
 outputDF['input_m'] = ins
-acrit = alpha_crit(outputDF['n'], outputDF['tau'])
-outputDF['a0'] = rand3 * acrit
+# acrit = alpha_crit(outputDF['n'], outputDF['tau'])
+# outputDF['a0'] = rand3 * acrit
 
-outputDF = outputDF.reindex(columns = outputDF.columns.tolist() + ['mem_stiff', 'prime_stiff', 'mem_time', 'prime_time'])
+outputDF = outputDF.reindex(columns = outputDF.columns.tolist() + ['mem_stiff', 'prime_stiff', 'mem_time', 'result_prime_time'])
 print('number of trials:',end=" "); print(len(outputDF))
 print(outputDF)
 
@@ -189,7 +217,9 @@ assert len(results) == len(outputDF)
 
 end = timeit.default_timer()
 
-fname = 'energy_dependent_LHS_ng'
+randlabel = np.random.randint(0,1000)
+
+fname = fdir + 'psweep_plain_trial_' + str(randlabel)
 results.loc[:, results.columns != 'input_m'].to_csv(fname+'.csv')
 np.save(fname+'_inputs.npy', results['input_m'].values)
 # test = np.load('inputs.npy', allow_pickle=True)
