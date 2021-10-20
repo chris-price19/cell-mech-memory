@@ -1,5 +1,7 @@
 # cell-mech-memory
 
+Code corresponding to: Price, C. C., Mathur, J., Boerckel, J. D., Pathak, A. & Shenoy, V. B. Dynamic self-reinforcement of gene expression determines acquisition of cellular mechanical memory. Biophysical Journal (2021).
+
 noise_parallel = single parameter set, noise trials (confirming statistical convergence)  
 psweep_noise_parallel = parameter sweep w/ noisy trials (figure 5)  
 psweep_Edependent_v2 = parameter sweep without noise (sensitivity)  
