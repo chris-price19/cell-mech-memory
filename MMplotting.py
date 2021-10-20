@@ -144,20 +144,20 @@ def plot_profile(fig, ax, resultsDF, params, x_solve, colors=[mcolors['darkorang
 
 
     ## legend
-    lns = lc1+lc2 +lc4 #+ lc4
+    lns = lc1+lc2 #+ lc4
     labs = [l.get_label() for l in lns]
-    ax[1].legend(lns, labs, loc='upper right')
+    ax[1].legend(lns, labs, loc=4)
     # ax[1].set_xlabel('time (hours)')
     # ax[1].yaxis.label.set_color('k')
     # ax[1].tick_params(axis='y', colors='k')
     
-    for ci, cc in enumerate(cumsum):
-        # print(ids)
-        # print(cumsum)
-        # print(dt)
-        if ci == 0:
-            continue
-        ax[1].plot([cc*dt, cc*dt],ax[1].get_ylim(),color=colors[ids[ci]-1], linestyle='--', linewidth=1.5, alpha = 0.6, zorder=0)
+
+    ## vertical lines, commenting out for powerpoint
+    # for ci, cc in enumerate(cumsum):
+        
+    #     if ci == 0:
+    #         continue
+    #     ax[1].plot([cc*dt, cc*dt],ax[1].get_ylim(),color=colors[ids[ci]-1], linestyle='--', linewidth=1.5, alpha = 0.6, zorder=0)
     
     ### m plot
     ax[0].set_ylim([np.amin(m / params['m0'])*0.8,np.amax(m / params['m0'])*1.1])
